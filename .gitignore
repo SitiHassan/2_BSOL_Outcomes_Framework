@@ -26,3 +26,7 @@
 *.ppt
 *.pptx
 *.svg
+
+/venv/
+__pycache__/
+/venv_local/
