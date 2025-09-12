@@ -778,6 +778,90 @@ GROUP BY
 
 Note that the `aggregation_id` column now contains Locality registered from the practice mapping table `EAT_Reporting_BSOL.Reference.BSOL_ICS_PracticeMapped`. We will map each locality label to its corresponding id at a later step. 
 
+## Build Local Authority registered-level data {#ch1-sec-build-la-reg-level-data}
+
+Use the locality registered -level data built in the previous step, update the `aggregation_id` column with the local authority registered code by assigning each locality accordingly, and finally aggregate the data by grouping on the required columns.
+
+Then, insert the aggregated data into the staging processed indicator data table created in [Step 3.1.1](#ch1-sec-staging-table-for-processed-indicator-data).
+
+Note that the `aggregation_id` column now contains Local Authority registered. 
+
+```{sql}
+#| connection: sql_connection
+#| code-fold: true
+#| code-summary: "Show example"
+#| eval: false
+
+/*=================================================================================================
+ Local Authority registered-level data
+=================================================================================================*/
+-- Take locality registered level data from the staging QOF data and update the local authority 
+DROP TABLE IF EXISTS #la_data
+SELECT * INTO #la_data
+FROM #staging_QOF_data
+WHERE aggregation_id IN ('North', 'East', 'West', 'Central', 'South', 'Solihull')
+
+UPDATE #la_data
+SET aggregation_id = 'E08000025'
+WHERE aggregation_id IN ('North', 'East', 'West', 'Central', 'South')
+
+UPDATE #la_data
+SET aggregation_id = 'E08000029'
+WHERE aggregation_id IN ('Solihull')
+
+INSERT INTO #staging_QOF_data
+(
+    indicator_id,
+    start_date,
+    end_date,
+    numerator,
+    denominator,
+    indicator_value,
+    lower_ci95,
+    upper_ci95,
+    imd_code,
+    aggregation_id,
+    age_group_code,
+    sex_code,
+    ethnicity_code,
+    creation_date,
+    value_type_code,
+    source_code
+)
+SELECT
+     indicator_id
+    ,start_date
+    ,end_date
+    ,SUM(numerator)           AS numerator
+    ,SUM(denominator)         AS denominator
+    ,indicator_value
+    ,lower_ci95
+    ,upper_ci95
+    ,imd_code                 -- All IMD
+    ,aggregation_id           -- map to reference ID later
+    ,age_group_code           -- All ages
+    ,sex_code                 -- All persons
+    ,ethnicity_code           -- All ethnicities
+    ,creation_date
+    ,value_type_code          -- Percentage
+    ,source_code              -- SQL
+FROM #la_data
+GROUP BY
+     indicator_id
+    ,start_date
+    ,end_date
+    ,indicator_value
+    ,lower_ci95
+    ,upper_ci95
+    ,imd_code
+	,aggregation_id
+    ,age_group_code
+    ,sex_code
+    ,ethnicity_code
+    ,creation_date
+    ,value_type_code
+    ,source_code;
+```
 ## Build ICB-level data {#ch1-sec-build-icb-level-data}
 
 Use the temporary GP-level data and aggregate it to the ICB-level data by grouping on the required columns.
@@ -875,19 +959,20 @@ FROM [EAT_Reporting_BSOL].[OF].[OF2_Reference_Geography]
 /*=================================================================================================
 Map geography codes to aggregation_id
 =================================================================================================*/
--- PCN and ICB
+-- PCN, ICB, LA registered
 UPDATE T1
 SET T1.[aggregation_id] = T2.[aggregation_id]
 FROM #staging_QOF_data AS T1
 JOIN [EAT_Reporting_BSOL].[OF].[OF2_Reference_Geography] AS T2
-  ON T1.[aggregation_id] = T2.[aggregation_code];
+  ON T1.[aggregation_id] = T2.[aggregation_code]
+WHERE T2.[aggregation_type] IN ('PCN', 'ICB', 'Local Authority (registered)')
 
 -- Locality registered
 UPDATE T1
 SET T1.[aggregation_id] = T2.[aggregation_id]
 FROM #staging_QOF_data AS T1
 JOIN [EAT_Reporting_BSOL].[OF].[OF2_Reference_Geography] AS T2
-  ON T1.[aggregation_id] = T2.[aggregation_label] -- map based on labels instead
+  ON T1.[aggregation_id] = T2.[aggregation_label] -- we're using labels instead of codes
 WHERE T2.[aggregation_type] = 'Locality (registered)'
 ```
 
@@ -1363,7 +1448,7 @@ SELECT TOP 1000 * FROM [EAT_Reporting_BSOL].[Reference].[LSOA_2011_to_LSOA_2021]
 
 ### Ward {#ch2-sec-ward}
 
-Use the reference table below to map LSOA 21 to Ward, and update the Ward column in the numerator dataset (`#BSOL_OF_tbStaging_NumeratorData`) accordingly.
+Use the reference table below to map LSOA 21 to Ward 2022, and update the Ward column in the numerator dataset (`#BSOL_OF_tbStaging_NumeratorData`) accordingly.
 
 ```{sql}
 #| connection: sql_connection
@@ -1380,20 +1465,19 @@ SELECT TOP 1000 * FROM [EAT_Reporting_BSOL].[Reference].[LSOA_2021_WARD_LAD]
 #| code-summary: "Show example"
 #| eval: false
 
-UPDATE      T1
-SET         T1.[ward_code]  = T2.[WD22CD]
- 
-FROM        #BSOL_OF_tbStaging_NumeratorData T1
- 
-INNER JOIN  [EAT_Reporting_BSOL].[Reference].[LSOA_2021_WARD_LAD] T2
-ON          T1.[lsoa_2021] = T2.[LSOA21CD]
+UPDATE    T1
+SET      T1.[ward_code]  = T2.[WD22CD]
 
+FROM    #BSOL_OF_tbStaging_NumeratorData T1
+
+INNER JOIN  [EAT_Reporting_BSOL].[Reference].[LSOA_2021_WARD_LAD] T2
+ON      T1.[lsoa_2021] = T2.[LSOA21CD] 
 
 ```
 
 ### LAD {#ch2-sec-lad}
 
-Similarly, use the reference table below to map LSOA 21 to LAD, and update the LAD column in the numerator dataset (`#BSOL_OF_tbStaging_NumeratorData`) accordingly.
+Similarly, use the reference table below to map LSOA 21 to LAD 2022, and update the LAD column in the numerator dataset (`#BSOL_OF_tbStaging_NumeratorData`) accordingly.
 
 ```{sql}
 #| connection: sql_connection
@@ -1410,13 +1494,13 @@ SELECT TOP 1000 * FROM [EAT_Reporting_BSOL].[Reference].[LSOA_2021_WARD_LAD]
 #| code-summary: "Show example"
 #| eval: false
 
-UPDATE      T1
-SET             T1.[lad_code]   = T2.[LAD22CD]
- 
-FROM        #BSOL_OF_tbStaging_NumeratorData T1
- 
+UPDATE    T1
+SET      T1.[lad_code]  = T2.[LAD22CD]
+
+FROM    #BSOL_OF_tbStaging_NumeratorData T1
+
 INNER JOIN  [EAT_Reporting_BSOL].[Reference].[LSOA_2021_WARD_LAD] T2
-ON          T1.[lsoa_2021] = T2.[LSOA21CD]
+ON      T1.[lsoa_2021] = T2.[LSOA21CD] 
 ```
 
 ### Locality (resident) {#ch2-sec-locality-resident}
@@ -2801,6 +2885,93 @@ SELECT
         ,[source_code]       
        
 ```
+## Build Local Authority registered-level data {#ch3-sec-build-la-reg-level-data}
+
+Use the locality registered -level data built in the previous step, update the `aggregation_id` column with the local authority registered code by assigning each locality accordingly, and finally aggregate the data by grouping on the required columns.
+
+Then, Insert this dataset into the staging table created in [Step 5.1](#ch3-sec-creating-staging-table).
+
+Note that the `aggregation_id` column now contains Local Authority registered. 
+
+```{sql}
+#| connection: sql_connection
+#| code-fold: true
+#| code-summary: "Show example"
+#| eval: false
+
+/*====================================================================================================================
+STEP 13: Create local authority registered-level dataset
+======================================================================================================================*/
+
+-- Take locality registered level data from the staging QOF data and update the local authority 
+DROP TABLE IF EXISTS #la_data
+SELECT * INTO #la_data
+FROM #staging_NDA_data
+WHERE aggregation_id IN ('North', 'East', 'West', 'Central', 'South', 'Solihull')
+
+UPDATE #la_data
+SET aggregation_id = 'E08000025'
+WHERE aggregation_id IN ('North', 'East', 'West', 'Central', 'South')
+
+UPDATE #la_data
+SET aggregation_id = 'E08000029'
+WHERE aggregation_id IN ('Solihull')
+
+INSERT INTO #staging_NDA_data (
+        [indicator_id]
+       ,[start_date]
+       ,[end_date]
+       ,[numerator]
+       ,[denominator]
+       ,[indicator_value]
+       ,[lower_ci95]
+       ,[upper_ci95] 
+       ,[imd_code] 
+       ,[aggregation_id] 
+       ,[age_group_code] 
+       ,[sex_code] 
+       ,[ethnicity_code] 
+       ,[creation_date] 
+       ,[value_type_code] 
+       ,[source_code]
+       )
+SELECT  
+         [indicator_id]
+        ,[start_date]
+        ,[end_date]
+        ,sum(numerator) as numerator
+        ,sum(denominator) as denominator
+        ,[indicator_value] 
+        ,[lower_ci95]
+        ,[upper_ci95] 
+        ,[imd_code]           -- All IMD
+        ,[aggregation_id]        -- Will map it to aggregation id later
+        ,[age_group_code]           -- All Ages
+        ,[sex_code]           -- All Persons 
+        ,[ethnicity_code]     
+        ,[creation_date]
+        ,[value_type_code]         -- Percentage
+        ,[source_code]             -- SQL
+		
+ FROM  #la_data T1
+ GROUP BY    
+         [indicator_id]
+        ,[start_date]
+        ,[end_date]
+        ,[indicator_value] 
+        ,[lower_ci95]
+        ,[upper_ci95] 
+        ,[imd_code]          
+        ,[aggregation_id]           
+        ,[age_group_code]     
+        ,[sex_code]          
+        ,[ethnicity_code]    
+        ,[creation_date]
+        ,[value_type_code]   
+        ,[source_code]  
+```
+
+
 ## Build ICB-level data {#ch3-sec-build-icb-level-data}
 
 Next, create an ICB-level dataset by using the GP-level dataset created in [Step 5.6](##ch3-sec-build-gp-level-data) and grouping the data by the required columns.
@@ -2816,7 +2987,7 @@ Insert this dataset into the staging table created in [Step 5.1](#ch3-sec-creati
 #| eval: false
 
 /*=======================================================================================================
-STEP 13: Create ICB-level dataset
+STEP 14: Create ICB-level dataset
 =======================================================================================================*/
 
 INSERT INTO #staging_NDA_data (
@@ -2891,22 +3062,24 @@ This ensures that the processed indicator data uses standardised codes and a con
 #| eval: false
 
 /*=======================================================================================================
-STEP 14: Map geography codes to aggregation_id
+STEP 15: Map geography codes to aggregation_id
 =======================================================================================================*/
---PCN and ICB
+--PCN, ICB and LA registered
 
 UPDATE T1
 SET    T1.[aggregation_id] = T2.[aggregation_id]
 FROM   #staging_NDA_data AS T1
 JOIN   [EAT_Reporting_BSOL].[OF].[OF2_Reference_Geography] AS T2
-       ON T1.[aggregation_id] = T2.[aggregation_code];
+       ON T1.[aggregation_id] = T2.[aggregation_code]
+WHERE T2.[aggregation_type] IN ('PCN', 'ICB', 'Local Authority (registered)')
+	   ;
 
 -- Locality registered
 UPDATE T1
 SET T1.[aggregation_id] = T2.[aggregation_id]
 FROM #staging_NDA_data AS T1
 JOIN [EAT_Reporting_BSOL].[OF].[OF2_Reference_Geography] AS T2
-  ON T1.[aggregation_id] = T2.[aggregation_label] -- map based on labels instead
+  ON T1.[aggregation_id] = T2.[aggregation_label]
 WHERE T2.[aggregation_type] = 'Locality (registered)'
 ```
 
@@ -2921,7 +3094,7 @@ Insert the data into the destination table (e.g., `[EAT_Reporting_BSOL].[OF].[OF
 #| eval: false
 
 /*=======================================================================================================
-STEP 15: Load into destination table
+STEP 16: Load into destination table
 =======================================================================================================*/
 INSERT INTO [EAT_Reporting_BSOL].[OF].[OF2_Indicator_SQL_Data]
 (
