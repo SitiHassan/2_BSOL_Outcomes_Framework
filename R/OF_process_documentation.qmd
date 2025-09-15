@@ -1783,6 +1783,7 @@ FROM        #BSOL_OF_tbStaging_NumeratorData T1
 
 INNER JOIN  [EAT_Reporting_BSOL].[OF].[OF2_Reference_Geography]  T2 
 ON          T1.[lad_code] = T2.[aggregation_code]
+WHERE       T2.[aggregation_type] = 'Local Authority (resident)' 
 ```
 
 ## Aggregate dataset {#ch2-sec-aggregate-dataset}
