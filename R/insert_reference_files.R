@@ -27,12 +27,10 @@ indicator_list_lookup    <- read_xlsx(reference_file_path, sheet = "indicator_li
 geography_lookup         <- read_xlsx(reference_file_path, sheet = "geography")
 
 # Initial population table
-population_reference_path <- file.path(directory_path, "Reference", "DemographicsTable5yrAllGendersNHSethIMD.csv")
-population_reference_file <- read.csv(population_reference_path)
 
-
-population2_reference_path <- file.path(directory_path, "Reference", "5yrAgeBandEthIMDFullPopulation.csv")
-population2_reference_file <- read.csv(population2_reference_path)
+# Using Census
+population_reference_path <- file.path(directory_path, "Reference", "5yrAgeBandEthIMDFullPopulation.csv")
+population_reference_file <- read.csv(population2_reference_path)
 
 #3. Establish SQL connection -----------------------------------------------------
 sql_connection <-
@@ -161,7 +159,7 @@ dbWriteTable(
   overwrite = TRUE
 )
 
-#13. Initial population table
+#13. Census population table
 
 # Clean names
 library(janitor)
@@ -172,20 +170,5 @@ dbWriteTable(
   sql_connection,
   Id(schema = "OF", table = "OF2_Reference_Initial_Population"),
   population_reference_file,
-  overwrite = TRUE
-)
-
-#13. Initial population table v2
-
-
-population2_reference_file <- clean_names(population2_reference_file)
-
-population2_reference_file <- population2_reference_file %>% 
-  rename(population_id = x)
-
-dbWriteTable(
-  sql_connection,
-  Id(schema = "OF", table = "OF2_Reference_Initial_Population_v2"),
-  population2_reference_file,
   overwrite = TRUE
 )
