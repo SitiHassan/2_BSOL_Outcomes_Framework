@@ -701,7 +701,7 @@ GROUP BY
     
 ```
 
-Note that the `aggregation_id` column now contains PCN codes. These codes will be mapped to their corresponding ids at a later step. 
+Note that the `aggregation_id` column now contains PCN codes. These codes will be mapped to their corresponding ids at a later step.
 
 ## Build Locality registered-level data {#ch1-sec-build-locality-reg-level-data}
 
@@ -776,7 +776,7 @@ GROUP BY
     
 ```
 
-Note that the `aggregation_id` column now contains Locality registered from the practice mapping table `EAT_Reporting_BSOL.Reference.BSOL_ICS_PracticeMapped`. We will map each locality label to its corresponding id at a later step. 
+Note that the `aggregation_id` column now contains Locality registered from the practice mapping table `EAT_Reporting_BSOL.Reference.BSOL_ICS_PracticeMapped`. We will map each locality label to its corresponding id at a later step.
 
 ## Build Local Authority registered-level data {#ch1-sec-build-la-reg-level-data}
 
@@ -784,7 +784,7 @@ Use the locality registered -level data built in the previous step, update the `
 
 Then, insert the aggregated data into the staging processed indicator data table created in [Step 3.1.1](#ch1-sec-staging-table-for-processed-indicator-data).
 
-Note that the `aggregation_id` column now contains Local Authority registered. 
+Note that the `aggregation_id` column now contains Local Authority registered.
 
 ```{sql}
 #| connection: sql_connection
@@ -862,6 +862,7 @@ GROUP BY
     ,value_type_code
     ,source_code;
 ```
+
 ## Build ICB-level data {#ch1-sec-build-icb-level-data}
 
 Use the temporary GP-level data and aggregate it to the ICB-level data by grouping on the required columns.
@@ -2071,7 +2072,22 @@ GROUP BY
 
 ## Create dataset with IMD collapsed to 'All' {#ch2-sec-create-dataset-with-imd-collapsed-to-all}
 
-This step enables calculation of rates or other value types by Ethnicity only.
+We would like to create additional datasets in the following combinations to enable calculation of values by IMD only, ethnicity only, IMD and ethnicity (already built in [Step 4.7](#ch2-sec-insert-data-into-staging-table)), and with no IMD and ethnicitty splits to get overall values.
+
+**Summary of required combinations:**
+
+| Combination | Sex | Age      | IMD      | Ethnicity      | Split                  |
+|-------------|-----|----------|----------|----------------|------------------------|
+| 1           | 999 | age_code | imd_code | ethnicity_code | both ethnicity and IMD |
+| 2           | 999 | age_code | imd_code | 999            | imd only               |
+| 3           | 999 | age_code | 999      | ethnicity_code | ethnicity only         |
+| 4           | 999 | age_code | 999      | 999            | none                   |
+
+: Aggregated datasets to be prepared before inserting data into the final.
+
+
+
+This step enables the calculation of rates (or other metrics) by ethnicity only; therefore, the IMD column is collapsed to “All.”
 
 Get all the columns from the staging processed indicator data and assign '999' code to the `imd_code` column, which corresponds to 'All (Persons)' category.
 
@@ -2173,9 +2189,60 @@ GROUP BY
 
 ```
 
+## Create dataset with both IMD and Ethnicity collapsed to 'All' {#ch2-sec-create-dataset-with-imd-ethnicity-collapsed-to-all}
+
+This step enables calculation of rates overall.
+
+Get all the columns from the staging processed indicator data and assign '999' code to the `ethnicity_code` and `imd_code` columns, which corresponds to 'All (Persons)' category. Make sure to **remove `imd_code` and `ethnicity_code` columns from the GROUP BY** statement.
+
+Save the data in a temporary table so that it can later be joined together with the other processed indicator data before inserting them into the destination table.
+
+```{sql}
+#| connection: sql_connection
+#| code-fold: true
+#| code-summary: "Show example"
+#| eval: false
+
+DROP TABLE IF EXISTS #temp3
+
+SELECT  
+            [indicator_id]
+,           [start_date]
+,           [end_date]
+,           SUM([numerator]) AS Numerator
+,           NULL AS Denominator
+,           NULL AS IndicatorValue     
+,           NULL AS LowerCI95
+,           NULL AS UpperCI95
+,           '999' AS [imd_code] -- All
+,           [aggregation_id]
+,           [age_group_code]
+,           [sex_code]
+,           '999' AS [ethnicity_code] -- All
+,           [creation_date]
+,           [value_type_code]
+,           [source_code]
+
+INTO        #temp3
+
+FROM        #BSOL_OF_tbStaging_SUS_Data
+
+GROUP BY 
+            [indicator_id]
+,           [start_date]
+,           [end_date]
+,           [aggregation_id]
+,           [age_group_code]
+,           [sex_code]
+,           [creation_date]
+,           [value_type_code]
+,           [source_code]
+
+```
+
 ## Insert data into destination table {#ch2-sec-insert-data-into-final-table}
 
-Union all datasets (i.e., from tables created in [Step 4.7](#ch2-sec-insert-data-into-staging-table), [Step 4.8](#ch2-sec-create-dataset-with-imd-collapsed-to-all), and [Step 4.9](#ch2-sec-create-dataset-with-ethnicity-collapsed-to-all)) and insert them into the destination table (e.g., `[EAT_Reporting_BSOL].[OF].[OF2_Indicator_SQL_Data])`.
+Union all datasets (i.e., from tables created in [Step 4.7](#ch2-sec-insert-data-into-staging-table), [Step 4.8](#ch2-sec-create-dataset-with-imd-collapsed-to-all), [Step 4.9](#ch2-sec-create-dataset-with-ethnicity-collapsed-to-all), [Step 4.10](#ch2-sec-create-dataset-with-imd-ethnicity-collapsed-to-all) and insert them into the destination table (e.g., `[EAT_Reporting_BSOL].[OF].[OF2_Indicator_SQL_Data])`.
 
 There is no need to remove old data, as each record has a creation date, and we will select the latest data during processing.
 
@@ -2191,7 +2258,10 @@ SELECT * FROM (
         UNION
     SELECT * FROM #temp1
         UNION
-    SELECT * FROM #temp2) AS final
+    SELECT * FROM #temp2
+        UNION
+    SELECT * FROM #temp3
+    ) AS final
 
 ```
 
@@ -2811,6 +2881,7 @@ SELECT
         ,[value_type_code]   
         ,[source_code]       
 ```
+
 ## Build Locality registered-level data {#ch3-sec-build-locality-reg-level-data}
 
 Next, create a locality registered-level dataset by using the GP-level dataset created in [Step 5.6](##ch3-sec-build-gp-level-data) and grouping the data by the required columns.
@@ -2886,13 +2957,14 @@ SELECT
         ,[source_code]       
        
 ```
+
 ## Build Local Authority registered-level data {#ch3-sec-build-la-reg-level-data}
 
 Use the locality registered -level data built in the previous step, update the `aggregation_id` column with the local authority registered code by assigning each locality accordingly, and finally aggregate the data by grouping on the required columns.
 
 Then, Insert this dataset into the staging table created in [Step 5.1](#ch3-sec-creating-staging-table).
 
-Note that the `aggregation_id` column now contains Local Authority registered. 
+Note that the `aggregation_id` column now contains Local Authority registered.
 
 ```{sql}
 #| connection: sql_connection
@@ -2971,7 +3043,6 @@ SELECT
         ,[value_type_code]   
         ,[source_code]  
 ```
-
 
 ## Build ICB-level data {#ch3-sec-build-icb-level-data}
 
@@ -3084,9 +3155,27 @@ JOIN [EAT_Reporting_BSOL].[OF].[OF2_Reference_Geography] AS T2
 WHERE T2.[aggregation_type] = 'Locality (registered)'
 ```
 
-## Insert data into destination table {#ch3-sec-insert-data-into-final-table}
+## Create dataset with IMD collapsed to 'All' {#ch3-sec-create-dataset-with-imd-collapsed-to-all}
 
-Insert the data into the destination table (e.g., `[EAT_Reporting_BSOL].[OF].[OF2_Indicator_SQL_Data])`. There is no need to remove old data, as each record has a creation date, and we will select the latest data during processing.
+We would like to create additional datasets in the following combinations to enable calculation of values by IMD only, ethnicity only, IMD and ethnicity (already built in Step 5.7 - 5.10), and with no IMD and ethnicity splits to get overall values.
+
+**Summary of required combinations:**
+
+| Combination | Sex | Age      | IMD      | Ethnicity      | Split                  |
+|-------------|-----|----------|----------|----------------|------------------------|
+| 1           | 999 | age_code | imd_code | ethnicity_code | both ethnicity and IMD |
+| 2           | 999 | age_code | imd_code | 999            | imd only               |
+| 3           | 999 | age_code | 999      | ethnicity_code | ethnicity only         |
+| 4           | 999 | age_code | 999      | 999            | none                   |
+
+: Aggregated datasets to be prepared before inserting data into the final.
+
+
+This step enables the calculation of rates (or other values) by ethnicity only; therefore, the IMD column is collapsed to “All.”
+
+Get all the columns from the staging processed indicator data and assign '999' code to the `imd_code` column, which corresponds to 'All (Persons)' category.
+
+Save the data in a temporary table so that it can later be joined together with the other processed indicator data before inserting them into the destination table.
 
 ```{sql}
 #| connection: sql_connection
@@ -3094,30 +3183,169 @@ Insert the data into the destination table (e.g., `[EAT_Reporting_BSOL].[OF].[OF
 #| code-summary: "Show example"
 #| eval: false
 
-/*=======================================================================================================
-STEP 16: Load into destination table
-=======================================================================================================*/
-INSERT INTO [EAT_Reporting_BSOL].[OF].[OF2_Indicator_SQL_Data]
-(
-         [indicator_id]
-	   , [start_date]
-	   , [end_date]
-	   , [numerator]
-	   , [denominator]
-	   , [indicator_value]
-	   , [lower_ci95]
-	   , [upper_ci95]
-	   , [imd_code]
-	   , [aggregation_id]
-	   , [age_group_code]
-	   , [sex_code]
-	   , [ethnicity_code]
-	   , [creation_date]
-	   , [value_type_code]
-	   , [source_code]
-)
-SELECT * FROM #staging_NDA_data;
+DROP TABLE IF EXISTS #temp1
 
+SELECT  
+            [indicator_id]
+,           [start_date]
+,           [end_date]
+,           SUM([numerator]) AS numerator
+,           NULL AS denominator
+,           NULL AS indicator_value     
+,           NULL AS lower_ci95
+,           NULL AS upper_ci95
+,           '999' AS imd_code -- All
+,           [aggregation_id]
+,           [age_group_code]
+,           [sex_code]
+,           [ethnicity_code]
+,           [creation_date]
+,           [value_type_code]
+,           [source_code]
+
+INTO        #temp1
+
+FROM        #staging_NDA_Data
+
+GROUP BY 
+            [indicator_id]
+,           [start_date]
+,           [end_date]
+,           [aggregation_id]
+,           [age_group_code]
+,           [sex_code]
+,           [ethnicity_code]
+,           [creation_date]
+,           [value_type_code]
+,           [source_code]
+
+```
+
+## Create dataset with Ethnicity collapsed to 'All' {#ch3-sec-create-dataset-with-ethnicity-collapsed-to-all}
+
+This step enables the calculation of rates (or other values) by IMD only; therefore, the Ethnicity column is collapsed to “All.”
+
+Get all the columns from the staging processed indicator data and assign '999' code to the `ethnicity_code` column, which corresponds to 'All (Persons)' category.
+
+Save the data in a temporary table so that it can later be joined together with the other processed indicator data before inserting them into the destination table.
+
+```{sql}
+#| connection: sql_connection
+#| code-fold: true
+#| code-summary: "Show example"
+#| eval: false
+
+DROP TABLE IF EXISTS #temp2
+
+SELECT  
+            [indicator_id]
+,           [start_date]
+,           [end_date]
+,           SUM([numerator]) AS Numerator
+,           NULL AS Denominator
+,           NULL AS IndicatorValue     
+,           NULL AS LowerCI95
+,           NULL AS UpperCI95
+,           [imd_code]
+,           [aggregation_id]
+,           [age_group_code]
+,           [sex_code]
+,           '999' AS [ethnicity_code] -- All
+,           [creation_date]
+,           [value_type_code]
+,           [source_code]
+
+INTO        #temp2
+
+FROM        #staging_NDA_Data
+
+GROUP BY 
+            [indicator_id]
+,           [start_date]
+,           [end_date]
+,           [imd_code]
+,           [aggregation_id]
+,           [age_group_code]
+,           [sex_code]
+,           [creation_date]
+,           [value_type_code]
+,           [source_code]
+
+```
+
+## Create dataset with both IMD and Ethnicity collapsed to 'All' {#ch3-sec-create-dataset-with-imd-ethnicity-collapsed-to-all}
+
+This step enables the calculation of rates (or other values) without stratifying by IMD or Ethnicity; therefore, both the IMD and Ethnicity columns are collapsed to “All.”
+
+Get all the columns from the staging processed indicator data and assign '999' code to the `ethnicity_code` and `imd_code` columns, which corresponds to 'All (Persons)' category. Make sure to **remove `imd_code` and `ethnicity_code` columns from the GROUP BY** statement.
+
+Save the data in a temporary table so that it can later be joined together with the other processed indicator data before inserting them into the destination table.
+
+```{sql}
+#| connection: sql_connection
+#| code-fold: true
+#| code-summary: "Show example"
+#| eval: false
+
+DROP TABLE IF EXISTS #temp3
+
+SELECT  
+            [indicator_id]
+,           [start_date]
+,           [end_date]
+,           SUM([numerator]) AS Numerator
+,           NULL AS Denominator
+,           NULL AS IndicatorValue     
+,           NULL AS LowerCI95
+,           NULL AS UpperCI95
+,           '999' AS [imd_code] -- All
+,           [aggregation_id]
+,           [age_group_code]
+,           [sex_code]
+,           '999' AS [ethnicity_code] -- All
+,           [creation_date]
+,           [value_type_code]
+,           [source_code]
+
+INTO        #temp3
+
+FROM        #staging_NDA_Data
+
+GROUP BY 
+            [indicator_id]
+,           [start_date]
+,           [end_date]
+,           [aggregation_id]
+,           [age_group_code]
+,           [sex_code]
+,           [creation_date]
+,           [value_type_code]
+,           [source_code]
+
+```
+
+## Insert data into destination table {#ch3-sec-insert-data-into-final-table}
+
+Union all datasets (i.e., from tables created in [Step 5.12](#ch3-sec-create-dataset-with-imd-collapsed-to-all), [Step 5.13](#ch3-sec-create-dataset-with-ethnicity-collapsed-to-all), [Step 4.9](#ch2-sec-create-dataset-with-ethnicity-collapsed-to-all), [Step 5.14](#ch3-sec-create-dataset-with-imd-ethnicity-collapsed-to-all) and insert them into the destination table (e.g., `[EAT_Reporting_BSOL].[OF].[OF2_Indicator_SQL_Data])`.
+
+There is no need to remove old data, as each record has a creation date, and we will select the latest data during processing.
+
+```{sql}
+#| connection: sql_connection
+#| code-fold: true
+#| code-summary: "Show example"
+#| eval: false
+
+INSERT INTO [EAT_Reporting_BSOL].[OF].[OF2_Indicator_SQL_Data]
+SELECT * FROM (
+    SELECT * FROM #staging_NDA_Data
+        UNION
+    SELECT * FROM #temp1
+        UNION
+    SELECT * FROM #temp2
+        UNION
+    SELECT * FROM #temp3
+    ) AS final
 
 ```
 
