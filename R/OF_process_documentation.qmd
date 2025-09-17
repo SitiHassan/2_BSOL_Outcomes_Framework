@@ -994,7 +994,30 @@ If the dataset that you're working with has ethnicity or IMD splits, we would li
 
 : Aggregated datasets to be prepared before inserting data into the final.
 
-Create a temporary table for each combination and union all 4 additional datasets with the dataset built previously. Then, insert them into the final destination table. 
+Create a temporary table for each combination and union all additional datasets with the dataset built previously. Then, insert them into the final destination table. 
+
+**Summary**:
+
+1. **Does my data have ethnicity and IMD?** If yes then you need **4** splits,
+ 
+- Ethnicity and IMD in your group by
+- Ethnicity only (IMD = '999')
+- IMD only (Ethnicity = '999')
+- Neither in the grouping (IMD and Ethnicity = '999')
+
+2. **Does my data have ethnicity but not IMD?** If yes then you need **2** splits,
+
+- Ethnicity only (IMD = '999')
+- Neither in the grouping (IMD and Ethnicity = '999')
+
+3. **Does my data have IMD but not ethnicity?** If yes then you need **2** splits,
+
+- IMD Only (Ethnicity = '999')
+- Neither in the grouping (IMD and Ethnicity = '999')
+
+4. **Does my data have neither IMD or Ethnicity?** If yes then you have **1** split,
+
+- Neither in the grouping (IMD and Ethnicity = '999')
 
 ## Update destination table {#ch1-sec-update-final-table}
 
@@ -2102,6 +2125,29 @@ We would like to create additional datasets in the following combinations to ena
 
 : Aggregated datasets to be prepared before inserting data into the final.
 
+**Summary**:
+
+1. **Does my data have ethnicity and IMD?** If yes then you need **4** splits,
+ 
+- Ethnicity and IMD in your group by
+- Ethnicity only (IMD = '999')
+- IMD only (Ethnicity = '999')
+- Neither in the grouping (IMD and Ethnicity = '999')
+
+2. **Does my data have ethnicity but not IMD?** If yes then you need **2** splits,
+
+- Ethnicity only (IMD = '999')
+- Neither in the grouping (IMD and Ethnicity = '999')
+
+3. **Does my data have IMD but not ethnicity?** If yes then you need **2** splits,
+
+- IMD Only (Ethnicity = '999')
+- Neither in the grouping (IMD and Ethnicity = '999')
+
+4. **Does my data have neither IMD or Ethnicity?** If yes then you have **1** split,
+
+- Neither in the grouping (IMD and Ethnicity = '999')
+
 This step enables the calculation of rates (or other metrics) by ethnicity only; therefore, the IMD column is collapsed to “All.”
 
 Get all the columns from the staging processed indicator data and assign '999' code to the `imd_code` column, which corresponds to 'All (Persons)' category.
@@ -3184,6 +3230,29 @@ We would like to create additional datasets in the following combinations to ena
 | 4           | 999 | age_code | 999      | 999            | none                   |
 
 : Aggregated datasets to be prepared before inserting data into the final.
+
+**Summary**:
+
+1. **Does my data have ethnicity and IMD?** If yes then you need **4** splits,
+ 
+- Ethnicity and IMD in your group by
+- Ethnicity only (IMD = '999')
+- IMD only (Ethnicity = '999')
+- Neither in the grouping (IMD and Ethnicity = '999')
+
+2. **Does my data have ethnicity but not IMD?** If yes then you need **2** splits,
+
+- Ethnicity only (IMD = '999')
+- Neither in the grouping (IMD and Ethnicity = '999')
+
+3. **Does my data have IMD but not ethnicity?** If yes then you need **2** splits,
+
+- IMD Only (Ethnicity = '999')
+- Neither in the grouping (IMD and Ethnicity = '999')
+
+4. **Does my data have neither IMD or Ethnicity?** If yes then you have **1** split,
+
+- Neither in the grouping (IMD and Ethnicity = '999')
 
 This step enables the calculation of rates (or other values) by ethnicity only; therefore, the IMD column is collapsed to “All.”
 
