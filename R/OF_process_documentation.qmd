@@ -979,6 +979,23 @@ WHERE T2.[aggregation_type] = 'Locality (registered)'
 
 When updating the `aggregation_id` column, the **`aggregation_id`** can be obtained by joining data based on the aggregation type (PCN, ICB, or Locality (registered)) and/or the aggregation code (PCN or ICB code).
 
+## Create additional datasets  {#ch1-sec-create-additional-datasets}
+
+If the dataset that you're working with has ethnicity or IMD splits, we would like you to create additional datasets in the following combinations to enable calculation of values by IMD only, ethnicity only, IMD and ethnicity (already built in the previous step), and with no IMD and ethnicity splits to get overall values.
+
+**Summary of required combinations:**
+
+| Combination | Sex | Age      | IMD      | Ethnicity      | Split                  |
+|------------|------------|------------|------------|------------|---------------|
+| 1           | 999 | age_code | imd_code | ethnicity_code | both ethnicity and IMD |
+| 2           | 999 | age_code | imd_code | 999            | imd only               |
+| 3           | 999 | age_code | 999      | ethnicity_code | ethnicity only         |
+| 4           | 999 | age_code | 999      | 999            | none                   |
+
+: Aggregated datasets to be prepared before inserting data into the final.
+
+Create a temporary table for each combination and union all 4 additional datasets with the dataset built previously. Then, insert them into the final destination table. 
+
 ## Update destination table {#ch1-sec-update-final-table}
 
 Insert the data into the destination table (e.g., `[EAT_Reporting_BSOL].[OF].[OF2_Indicator_SQL_Data])`. There is no need to remove old data, as each record has a creation date, and we will select the latest data during processing.
@@ -1029,7 +1046,7 @@ SELECT
     creation_date,
     value_type_code,
     source_code
-FROM #staging_QOF_data;
+FROM #staging_QOF_data; -- if there is no IMD or ethnicity split. Otherwise, insert the other four datasets for the four combinations into the destination table as well 
 
 ```
 
@@ -2077,15 +2094,13 @@ We would like to create additional datasets in the following combinations to ena
 **Summary of required combinations:**
 
 | Combination | Sex | Age      | IMD      | Ethnicity      | Split                  |
-|-------------|-----|----------|----------|----------------|------------------------|
+|------------|------------|------------|------------|------------|---------------|
 | 1           | 999 | age_code | imd_code | ethnicity_code | both ethnicity and IMD |
 | 2           | 999 | age_code | imd_code | 999            | imd only               |
 | 3           | 999 | age_code | 999      | ethnicity_code | ethnicity only         |
 | 4           | 999 | age_code | 999      | 999            | none                   |
 
 : Aggregated datasets to be prepared before inserting data into the final.
-
-
 
 This step enables the calculation of rates (or other metrics) by ethnicity only; therefore, the IMD column is collapsed to “All.”
 
@@ -3162,14 +3177,13 @@ We would like to create additional datasets in the following combinations to ena
 **Summary of required combinations:**
 
 | Combination | Sex | Age      | IMD      | Ethnicity      | Split                  |
-|-------------|-----|----------|----------|----------------|------------------------|
+|------------|------------|------------|------------|------------|---------------|
 | 1           | 999 | age_code | imd_code | ethnicity_code | both ethnicity and IMD |
 | 2           | 999 | age_code | imd_code | 999            | imd only               |
 | 3           | 999 | age_code | 999      | ethnicity_code | ethnicity only         |
 | 4           | 999 | age_code | 999      | 999            | none                   |
 
 : Aggregated datasets to be prepared before inserting data into the final.
-
 
 This step enables the calculation of rates (or other values) by ethnicity only; therefore, the IMD column is collapsed to “All.”
 
