@@ -3,6 +3,7 @@ library(readxl)
 library(DBI)
 library(odbc)
 library(PHEindicatormethods)
+library(tibble)
 
 # 1 Read metadata --------------------------------------------------------------
 metadata <- read_xlsx("data/metadata.xlsx")
@@ -26,10 +27,12 @@ staging_data <- dbGetQuery(
 run_all <- function(staging_data, metadata = NULL, use_metadata = TRUE) {
 
   # Run insert_sharepoint_data.R
+  source(file.path("R/insert_sharepoint_data.R"))
+
   # Run sql script to combine data from multiple sources
 
   # Source function files (define calculate_dsr3, calculate_values, check_row_counts)
-  source(file.path("R/utility.R"))
+  source(file.path("R/util.R"))
   source(file.path("R/etl.R"))
 
   # Decide whether to pass metadata or not (calculate_values handles NULL)
@@ -49,7 +52,8 @@ run_all <- function(staging_data, metadata = NULL, use_metadata = TRUE) {
 # 5) Execute and capture output -------------------------------------------------
 output <- run_all(staging_data = staging_data, metadata = metadata, use_metadata = TRUE)
 
-# Add insertion time stamp and data types are consistent
+
+# Add insertion time stamp and make sure data types are consistent
 output <- output |>
   mutate(insertion_date = Sys.time()) |>
   mutate(
@@ -77,5 +81,5 @@ output <- output |>
 dbWriteTable(sql_connection,
              name = Id(schema = "OF", table = "OF2_Indicator_Processed_Data"),
              value = output,
-             overwrite = TRUE)
+             append = TRUE)
 
