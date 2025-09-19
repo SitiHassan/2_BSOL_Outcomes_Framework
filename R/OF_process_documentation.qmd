@@ -1,5 +1,5 @@
 ---
-title: "Outcome Framework Process Documentation"
+title: "Outcomes Framework Process Documentation"
 date: "`r Sys.Date()`"
 author: Siti Hassan
 date-format: "D MMMM YYYY"
