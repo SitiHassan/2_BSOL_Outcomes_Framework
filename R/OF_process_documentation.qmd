@@ -1097,13 +1097,13 @@ The following steps will guide you through building OF indicators without pre-de
 
 In this case, the denominator will be derived using population estimates from the Census, while the numerator will come from the data source. Since the data source is patient-level, the numerator will be calculated by grouping patient-level activity.
 
-In addition, the geography levels for these indicators are based on **residence**---i.e., Ward, Locality (resident), and Local Authority District (LAD)---rather than GP registration, where the levels would instead be PCN and ICB.
+In addition, the geography levels for these indicators are based on **residence**---i.e., Ward, Locality (resident), Local Authority District (LAD), and ICB ---rather than GP registration, where the levels would instead be PCN, Locality (registered), LAD and ICB.
 
 **Firstly**, create a new SQL script per indicator and name the file as follows:
 
 **`ID_{indicator_id}_{indicator_short_name}`**
 
-Save the script in the corresponding data source folder within the Outcome Framework Rebuild path:
+Save the script in the corresponding data source folder within the Outcomes Framework Rebuild path:
 
 **`02_Routine > BSOLBI_0033_Outcome_Framework_Rebuild > SQL`**
 
@@ -1115,7 +1115,7 @@ We begin by creating three staging tables to store data at different steps:
 
 -   One table stores the numerator dataset;
 
--   The other stores the processed indicator data, which will be used to update the final OF dataset.
+-   The other stores the processed indicator data, which will be used to update the final destination table.
 
 ### Temporary table for BSOL residents {#ch2-sec-temporary-table-for-bsol-residents}
 
@@ -1133,6 +1133,18 @@ DROP TABLE IF EXISTS #BSOL_OF_tbIndicator_PtsCohort_IP
 CREATE TABLE    #BSOL_OF_tbIndicator_PtsCohort_IP (episode_id BIGINT NOT NULL)
 ```
 
+Alternatively, you can use the static table below, which stores the inpatient admissions episode IDs of all BSOL patients extracted from both historic SEM SUS data extracts (from April 2015 to March 2018) and current and live SUS+ data extracts (from April 2018 onward), to derive numerators. The original SQL script to create this table is `SQL > SUS > Episode ID Table Creation.sql`.
+
+
+```{sql}
+#| connection: sql_connection
+#| code-fold: true
+#| code-summary: "Show code"
+#| eval: false
+SELECT TOP 1000 * FROM EAT_Reporting_BSOL.Development.BSOL_BI_0033_SUS_IP_Episodes
+```
+
+
 ### Temporary table for numerator data {#ch2-sec-temporary-table-for-numerator-data}
 
 This temporary table will store the numerator dataset, containing all columns required to create aggregated data at geographical levels (Ward, Locality Resident, LAD) and with demographic splits.
@@ -1145,29 +1157,29 @@ This temporary table will store the numerator dataset, containing all columns re
 
 DROP TABLE IF EXISTS #BSOL_OF_tbStaging_NumeratorData
 
-CREATE TABLE            #BSOL_OF_tbStaging_NumeratorData 
-
-(                       [indicator_id]          INT
-,                       [time_period]           INT
-,                       [financial_year]        VARCHAR (7)
-,                       [ethnicity_code]        VARCHAR (5)
-,                       [sex]                   VARCHAR (25)
-,                       [age]                   VARCHAR (25)
-,                       [imd]                   VARCHAR (25)
-,                       [lsoa_2011]             VARCHAR (9) 
-,                       [lsoa_2021]             VARCHAR (9)
-,                       [ward_code]             VARCHAR (9)
-,                       [locality_res]          VARCHAR (10)
-,                       [lad_code]              VARCHAR (9)
-,                       [episode_id]            BIGINT NOT NULL 
-,                       [numerator]             FLOAT
-)
+  CREATE TABLE			#BSOL_OF_tbStaging_NumeratorData 
+              (		      [indicator_id]			INT
+                       ,[time_period]			INT
+                       ,[financial_year]	VARCHAR (7)
+                       ,[ethnicity_code]	VARCHAR (5)
+                       ,[sex]				      VARCHAR (25) 
+                       ,[age]					    VARCHAR (25)
+                       ,[imd]					    VARCHAR (25)
+                       ,[lsoa_2011]				VARCHAR (9)	
+                       ,[lsoa_2021]				VARCHAR (9)
+                       ,[ward_code]				VARCHAR (9)
+                       ,[locality_res]		VARCHAR (10)
+                       ,[lad_code]				VARCHAR (9)
+                       ,[episode_id]			BIGINT NOT NULL 
+					             ,[SEM_Extract]			TINYINT
+                       ,[numerator]				FLOAT
+              )
 
 ```
 
 ### Staging table for processed indicator data {#ch2-sec-staging-table-for-processed-indicator-data}
 
-This table will store the processed indicator data for each required geography level and demographic split, which will subsequently be used to update the final indicator data table.
+This table will store the processed indicator data for each required geography level and demographic split, which will subsequently be used to update the final destination table.
 
 It must therefore include all columns defined in the specified data structure of the destination table (i.e., `[EAT_Reporting_BSOL].[OF].[OF2_Indicator_SQL_Data]`).
 
@@ -1233,6 +1245,9 @@ AND             T2.OSLAUA  IN ('E08000025', 'E08000029')                    --Bh
 
 ```
 
+Alternatively, you can skip this step and move to the next step if you're using this static table `EAT_Reporting_BSOL.Development.BSOL_BI_0033_SUS_IP_Episodes` to derive numerators, since it is already filtered to include data for BSOL patients within the specified time periods.
+
+
 ## Extract numerator {#ch2-sec-extract-numerator}
 
 Check the [metadata](https://birminghamandsolihullccg.sharepoint.com/:f:/r/sites/BirminghamandSolihullIntegratedIntelligenceHub/Shared%20Documents/Outcome%20Framework%20Rebuild/Metadata?csf=1&web=1&e=2HFEtp) file to get the definition of the numerator and extract it accordingly.
@@ -1249,32 +1264,72 @@ Insert the numerator, along with the indicator ID and episode ID, into the numer
 #| code-summary: "Show example"
 #| eval: false
 
-INSERT INTO     #BSOL_OF_tbStaging_NumeratorData
-(               indicator_id
-,               episode_id
-,               numerator
+/*==============================================================================================================
+ BUILD NUMERATOR DATASET - SUS+ data extracts
+=============================================================================================================*/
+
+  INSERT INTO #BSOL_OF_tbStaging_NumeratorData
+             (	indicator_id
+			         ,SEM_Extract
+               ,episode_id
+               ,numerator
+             )
+             (
+  SELECT DISTINCT 
+         10					            AS [indicator_id]
+        ,0								      AS [SEM_Extract]
+        ,T1.episode_id
+        ,1					            AS [numerator]
+
+    FROM EAT_Reporting_BSOL.Development.BSOL_BI_0033_SUS_IP_Episodes T1
+   INNER JOIN EAT_Reporting.dbo.tbIpDiagnosisRelational T2
+      ON T1.episode_id = T2.EpisodeID	
+   INNER JOIN EAT_Reporting.dbo.tbInpatientEpisodes T3
+      ON T1.episode_id = T3.EpisodeId
+
+   WHERE 1=1
+     AND LEFT(T3.AdmissionMethodCode,1) = '2'					--Emergency admissions
+     AND T3.OrderInSpell =1														--First Episode in Spell
+     AND LEFT(T2.DiagnosisCode,3) IN ('X60','X61','X62','X63','X64','X66','X67','X68','X69'
+						             ,'X70','X71','X72','X73','X74','X75','X76','X77','X78','X79'
+						             ,'X80','X81','X82','X83','X84')                                  --Self Harm
+     AND T1.SEM_Extract = 0 
+              )
+
+ /*=============================================================================================================
+ BUILD NUMERATOR DATASET - Historic SEM SUS data extracts
+==============================================================================================================*/
+
+INSERT INTO		#BSOL_OF_tbStaging_NumeratorData
+(				indicator_id
+,				SEM_Extract
+,				episode_id
+,				numerator
 )
 
 (
-SELECT          10                              AS [indicator_id]
-,               T1.episode_id
-,               1                               AS [numerator]
+  SELECT DISTINCT 
+         10					            AS [indicator_id]
+        ,1								AS [SEM_Extract]
+        ,T1.episode_id
+        ,1					            AS [numerator]
+FROM			EAT_Reporting_BSOL.Development.BSOL_BI_0033_SUS_IP_Episodes T1
 
-FROM            #BSOL_OF_tbIndicator_PtsCohort_IP T1
+INNER JOIN		EAT_Reporting.SEM_dbo.tbIpDiagnosisRelational T2
+ON				T1.episode_id = T2.EpisodeID	
 
-INNER JOIN      EAT_Reporting.dbo.tbIpDiagnosisRelational T2
-ON              T1.episode_id = T2.EpisodeID    
+INNER JOIN		EAT_Reporting.SEM_dbo.tbInpatientEpisodes T3
+ON				T1.episode_id = T3.EpisodeId
 
-INNER JOIN      EAT_Reporting.dbo.tbInpatientEpisodes T3
-ON              T1.episode_id = T3.EpisodeId
-
-WHERE           1=1
-AND             LEFT(T3.AdmissionMethodCode,1) = 2      --Emergency admissions
-AND             T3.OrderInSpell =1                                      --First Episode in Spell
-AND             LEFT(T2.DiagnosisCode,3) IN ('X60','X61','X62','X63','X64','X66','X67','X68','X69','X70','X71','X72','X73','X74','X75','X76','X77','X78','X79','X80','X81','X82','X83','X84')                                  --Self Harm
-
-GROUP BY        T1.episode_id
+WHERE			1=1
+AND				LEFT(T3.AdmissionMethodCode,1) = '2'										--Emergency admissions
+AND				T3.OrderInSpell =1														--First Episode in Spell
+AND				LEFT(T2.DiagnosisCode,3) IN ('X60','X61','X62','X63','X64','X66','X67','X68','X69'
+						,'X70','X71','X72','X73','X74','X75','X76','X77','X78','X79'
+						,'X80','X81','X82','X83','X84')                                  --Self Harm
+AND			    T1.SEM_Extract = 1
 )
+
 
 ```
 
@@ -1292,13 +1347,31 @@ Use the time period column in the data source to update the corresponding column
 #| code-summary: "Show example"
 #| eval: false
 
-UPDATE      T1
-SET         T1.[time_period]    = T2.[ReconciliationPoint]
+-- Current Table SUS+ data Extracts
 
-FROM        #BSOL_OF_tbStaging_NumeratorData T1
+UPDATE		T1
+SET			T1.[time_period]	= T2.[ReconciliationPoint]
 
-INNER JOIN  [EAT_Reporting].[dbo].[tbInpatientEpisodes] T2
-ON          T1.[episode_id] = T2.[EpisodeId] 
+
+FROM		#BSOL_OF_tbStaging_NumeratorData T1
+
+INNER JOIN	[EAT_Reporting].[dbo].[tbInpatientEpisodes] T2
+ON			T1.[episode_id] = T2.[EpisodeId] 
+
+WHERE		T1.SEM_Extract = 0
+
+-- Historic SEM SUS Data Extract
+
+UPDATE		T1
+SET			T1.[time_period]	= T2.[ReconciliationPoint]
+
+FROM		#BSOL_OF_tbStaging_NumeratorData T1
+
+INNER JOIN	[EAT_Reporting].[SEM_dbo].[tbInpatientEpisodes] T2
+ON			T1.[episode_id] = T2.[EpisodeId] 
+
+WHERE		T1.SEM_Extract = 1
+AND		    T1.time_period IS NULL
 
 ```
 
@@ -1344,13 +1417,31 @@ Use the age column in the data source update the corresponding column in the num
 #| code-fold: true
 #| code-summary: "Show example"
 #| eval: false
-UPDATE          T1
-SET             T1.[age]            = T2.[AgeonAdmission]
 
-FROM        #BSOL_OF_tbStaging_NumeratorData T1
+-- Current Table SUS+ data Extracts
 
-INNER JOIN  [EAT_Reporting].[dbo].[tbInpatientEpisodes] T2
-ON          T1.[episode_id] = T2.[EpisodeId]
+UPDATE		T1
+SET			T1.[age]			= T2.[AgeonAdmission]
+
+FROM		#BSOL_OF_tbStaging_NumeratorData T1
+
+INNER JOIN	[EAT_Reporting].[dbo].[tbInpatientEpisodes] T2
+ON			T1.[episode_id] = T2.[EpisodeId] 
+
+WHERE		T1.SEM_Extract = 0
+
+-- Historic SEM SUS Data Extract
+
+UPDATE		T1
+SET			T1.[age]			= T2.[AgeonAdmission]
+
+FROM		#BSOL_OF_tbStaging_NumeratorData T1
+
+INNER JOIN	[EAT_Reporting].[SEM_dbo].[tbInpatientEpisodes] T2
+ON			T1.[episode_id] = T2.[EpisodeId] 
+
+WHERE		T1.SEM_Extract = 1
+AND			T1.Age IS NULL
 ```
 
 ### Sex {#ch2-sec-sex}
@@ -1374,16 +1465,38 @@ SELECT TOP 1000 * FROM [Reference].[dbo].[DIM_tbGender]
 #| code-summary: "Show example"
 #| eval: false
 
-UPDATE      T1
-SET         T1.[sex]            = T3.[GenderDescription]
+-- Current Table SUS+ data Extracts
 
-FROM        #BSOL_OF_tbStaging_NumeratorData T1
+UPDATE		T1
+SET			T1.[sex]			= T3.[GenderDescription]
 
-INNER JOIN  [EAT_Reporting].[dbo].[tbInpatientEpisodes] T2
-ON          T1.[episode_id] = T2.[EpisodeId]
+FROM		#BSOL_OF_tbStaging_NumeratorData T1
 
-LEFT JOIN   [Reference].[dbo].[DIM_tbGender] T3
-ON          T2.GenderCode = T3.GenderCode
+INNER JOIN	[EAT_Reporting].[dbo].[tbInpatientEpisodes] T2
+ON			T1.[episode_id] = T2.[EpisodeId]
+
+LEFT JOIN	[Reference].[dbo].[DIM_tbGender] T3
+ON			T2.GenderCode = T3.GenderCode 
+
+WHERE	    T1.SEM_Extract = 0
+
+
+-- Historic SEM SUS Data Extract
+
+UPDATE		T1
+SET			T1.[sex]			= T3.[GenderDescription]
+
+FROM		#BSOL_OF_tbStaging_NumeratorData T1
+
+INNER JOIN	[EAT_Reporting].[SEM_dbo].[tbInpatientEpisodes] T2
+ON			T1.[episode_id] = T2.[EpisodeId]
+
+LEFT JOIN	[Reference].[dbo].[DIM_tbGender] T3
+ON			T2.GenderCode = T3.GenderCode 
+
+WHERE	    T1.SEM_Extract = 1
+AND			T1.Sex IS NULL
+
 
 ```
 
@@ -1405,16 +1518,38 @@ SELECT TOP 1000 * FROM EAT_Reporting_BSOL.Demographic.Ethnicity
 #| code-fold: true
 #| code-summary: "Show example"
 #| eval: false
-UPDATE      T1
-SET         T1.[ethnicity_code] = T3.[Ethnic_Code]
+-- Current Table SUS+ data Extracts
 
-FROM        #BSOL_OF_tbStaging_NumeratorData T1
+UPDATE		T1
+SET			T1.[ethnicity_code]	= T3.[Ethnic_Code]
 
-INNER JOIN  [EAT_Reporting].[dbo].[tbInpatientEpisodes] T2
-ON          T1.[episode_id] = T2.[EpisodeId]
+FROM		#BSOL_OF_tbStaging_NumeratorData T1
 
-INNER JOIN  EAT_Reporting_BSOL.Demographic.Ethnicity T3
-ON          T2.[NHSNumber] = T3.[Pseudo_NHS_Number]
+INNER JOIN	[EAT_Reporting].[dbo].[tbInpatientEpisodes] T2
+ON			T1.[episode_id] = T2.[EpisodeId]
+
+INNER JOIN	EAT_Reporting_BSOL.Demographic.Ethnicity T3
+ON			T2.[NHSNumber] = T3.[Pseudo_NHS_Number] 
+
+WHERE		T1.SEM_Extract = 0
+
+
+-- Historic SEM SUS Data Extract
+
+UPDATE		T1
+SET			T1.[ethnicity_code]	= T3.[Ethnic_Code]
+
+FROM		#BSOL_OF_tbStaging_NumeratorData T1
+
+INNER JOIN	[EAT_Reporting].[SEM_dbo].[tbInpatientEpisodes] T2
+ON			T1.[episode_id] = T2.[EpisodeId]
+
+INNER JOIN	EAT_Reporting_BSOL.Demographic.Ethnicity T3
+ON			T2.[NHSNumber] = T3.[Pseudo_NHS_Number] 
+
+WHERE		T1.SEM_Extract = 1
+AND			T1.Ethnicity_Code IS NULL
+
 
 ```
 
@@ -1425,15 +1560,19 @@ For any missing values, use the ethnicity column from **data source** to update 
 #| code-fold: true
 #| code-summary: "Show example"
 #| eval: false
-UPDATE      T1
-SET         T1.[ethnicity_code] = T2.[EthnicCategoryCode] 
+/*==============================================================================================================
+UPDATE COLUMNS - UPDATES ANY MISSING ETHNICITY FROM RAW SOURCE DATA (i.e. SUS) -- This is for NULL NHS Numbers or patients with unknown ethnicity
+=============================================================================================================*/
 
-FROM        #BSOL_OF_tbStaging_NumeratorData T1
+UPDATE		T1
+SET			T1.[ethnicity_code]	= T2.[EthnicCategoryCode] 
 
-INNER JOIN  [EAT_Reporting].[dbo].[tbInpatientEpisodes] T2
-ON          T1.[episode_id] = T2.[EpisodeId]
+FROM		#BSOL_OF_tbStaging_NumeratorData T1
 
-WHERE       T1.Ethnicity_Code IS NULL
+INNER JOIN	[EAT_Reporting].[dbo].[tbInpatientEpisodes] T2
+ON			T1.[episode_id] = T2.[EpisodeId]
+
+WHERE		T1.Ethnicity_Code IS NULL 
 ```
 
 Finally, **clean the ethnicity code** to ensure that the relevant codes are used consistently and correctly.
@@ -1467,14 +1606,45 @@ Use the LSOA columns in the data source to update the corresponding columns in t
 #| eval: false
 
 
-UPDATE      T1
-SET         T1.[lsoa_2011]  = T2.[LowerlayerSuperOutputArea2011]
-,           T1.[lsoa_2021]  = T2.[LowerlayerSuperOutputArea2021]
-FROM        #BSOL_OF_tbStaging_NumeratorData T1
+-- Current Table SUS+ data Extracts
 
-INNER JOIN  [EAT_Reporting].[dbo].[tbIPPatientGeography] T2 
+UPDATE		T1
+SET			T1.[lsoa_2021]	= T2.[LowerlayerSuperOutputArea2021]
 
-ON          T1.[episode_id] = T2.[EpisodeId] 
+FROM		#BSOL_OF_tbStaging_NumeratorData T1
+
+INNER JOIN	[EAT_Reporting].[dbo].[tbIPPatientGeography] T2		
+
+ON			T1.[episode_id] = T2.[EpisodeId] 
+
+WHERE		T1.SEM_Extract = 0
+
+
+-- Can do LSOA 2011	best fit lookup to LSOA 2021 as alternative if SEM extract doesnt get LSOA 2021 populated
+
+UPDATE		T1
+SET			T1.[lsoa_2021]	= T2.[LSOA21CD]
+
+FROM		#BSOL_OF_tbStaging_NumeratorData T1
+
+INNER JOIN	[EAT_Reporting_BSOL].[Reference].[LSOA_2011_to_LSOA_2021] T2		
+
+ON			T1.[lsoa_2011] = T2.[LSOA11CD] 
+
+WHERE		T1.SEM_Extract = 1
+AND		    T1.LSOA_2021 IS NULL
+
+
+/*==============================================================================================================
+DELETE any 2021 LSAO NOT IN BSOL
+==============================================================================================================*/
+
+DELETE T1
+FROM #BSOL_OF_tbStaging_NumeratorData T1
+
+left join [EAT_Reporting_BSOL].[Reference].[LSOA_2021_BSOL_Codes] T2
+on T1.lsoa_2021 = T2.LSOA21CD
+where T2.LSOA21CD Is null
 ```
 
 If the LSOA 21 column is not available in the data source, use the reference table below to map LSOA 11 to LSOA 21.
@@ -1593,6 +1763,7 @@ SELECT TOP 1000 * FROM [EAT_Reporting_BSOL].[OF].[OF2_Reference_Ward_To_IMD]
 #| code-summary: "Show example"
 #| eval: false
 
+--ward-based IMD
 UPDATE      T1
 SET         T1.[IMD]    = T2.[quintile]
 
@@ -1891,44 +2062,6 @@ GROUP BY
 
 ```
 
-### LAD geography {#ch2-sec-lad-geography}
-
-```{sql}
-#| connection: sql_connection
-#| code-fold: true
-#| code-summary: "Show example"
-#| eval: false
-
-SELECT      
-            T1.[indicator_id]
-,           CAST(LEFT(T1.financial_year, 4) + '-04-01' AS DATE) AS start_date
-,           CAST('20' + RIGHT(T1.financial_year, 2) + '-03-31' AS DATE) AS end_date
-,           SUM(T1.numerator) AS numerator
-,           CAST(NULL AS INT) AS denominator
-,           CAST(NULL AS NUMERIC) AS indicator_value
-,           CAST(NULL AS NUMERIC) AS lower_ci95
-,           CAST(NULL AS NUMERIC) AS upper_ci95
-,           T1.[imd] AS imd_code
-,           T1.[lad_code] AS aggregation_id
-,           T1.[age] AS gae_group_code
-,           t1.[sex] AS sex_code 
-,           T1.[ethnicity_code] AS ethnicity_code
-,           CAST(CURRENT_TIMESTAMP AS date) AS creation_date
-,           '4' AS value_type_code --DASR
-,           '1' AS source_code
-FROM        #BSOL_OF_tbStaging_NumeratorData T1
-
-GROUP BY 
-            T1.[indicator_id]
-,           CAST(LEFT(T1.[financial_year], 4) + '-04-01' AS DATE)
-,           CAST('20' + RIGHT(T1.[financial_year], 2) + '-03-31' AS DATE)
-,           T1.[imd]
-,           T1.[lad_code]
-,           T1.[age]
-,           T1.[sex]
-,           T1.[ethnicity_code] 
-
-```
 
 ### Locality (resident) geography {#ch2-sec-locality-resident-geography}
 
@@ -1972,6 +2105,87 @@ GROUP BY
 
 
 ```
+
+### LAD geography {#ch2-sec-lad-geography}
+
+```{sql}
+#| connection: sql_connection
+#| code-fold: true
+#| code-summary: "Show example"
+#| eval: false
+
+SELECT      
+            T1.[indicator_id]
+,           CAST(LEFT(T1.financial_year, 4) + '-04-01' AS DATE) AS start_date
+,           CAST('20' + RIGHT(T1.financial_year, 2) + '-03-31' AS DATE) AS end_date
+,           SUM(T1.numerator) AS numerator
+,           CAST(NULL AS INT) AS denominator
+,           CAST(NULL AS NUMERIC) AS indicator_value
+,           CAST(NULL AS NUMERIC) AS lower_ci95
+,           CAST(NULL AS NUMERIC) AS upper_ci95
+,           T1.[imd] AS imd_code
+,           T1.[lad_code] AS aggregation_id
+,           T1.[age] AS age_group_code
+,           t1.[sex] AS sex_code 
+,           T1.[ethnicity_code] AS ethnicity_code
+,           CAST(CURRENT_TIMESTAMP AS date) AS creation_date
+,           '4' AS value_type_code --DASR
+,           '1' AS source_code
+FROM        #BSOL_OF_tbStaging_NumeratorData T1
+
+GROUP BY 
+            T1.[indicator_id]
+,           CAST(LEFT(T1.[financial_year], 4) + '-04-01' AS DATE)
+,           CAST('20' + RIGHT(T1.[financial_year], 2) + '-03-31' AS DATE)
+,           T1.[imd]
+,           T1.[lad_code]
+,           T1.[age]
+,           T1.[sex]
+,           T1.[ethnicity_code] 
+
+```
+
+### ICB geography {#ch2-sec-icb-geography}
+
+```{sql}
+#| connection: sql_connection
+#| code-fold: true
+#| code-summary: "Show example"
+#| eval: false
+
+SELECT		
+			T1.[indicator_id]
+,			CAST(LEFT(T1.[financial_year], 4) + '-04-01' AS DATE) AS start_date
+,			CAST('20' + RIGHT(T1.[financial_year], 2) + '-03-31' AS DATE) AS end_date
+,			SUM(T1.[numerator]) AS numerator
+,			CAST(NULL AS INT) AS denominator
+,			CAST(NULL AS NUMERIC) AS indicator_value
+,			CAST(NULL AS NUMERIC) AS lower_ci95
+,			CAST(NULL AS NUMERIC) AS upper_ci95
+,			T1.[imd] AS imd_code
+,			'151' AS aggregation_id -- ICB Level
+,			T1.[age] AS age_group_code
+,			T1.[sex] AS sex_code 
+,			T1.[ethnicity_code]
+,			CAST(CURRENT_TIMESTAMP AS DATE) AS creation_date
+,			'4' AS value_type_code --DASR
+,			'1' AS source_code -- SQL
+FROM		#BSOL_OF_tbStaging_NumeratorData T1
+    
+GROUP BY 
+			T1.[indicator_id]
+,			CAST(LEFT(T1.[financial_year], 4) + '-04-01' AS DATE)
+,			CAST('20' + RIGHT(T1.[financial_year], 2) + '-03-31' AS DATE)
+,			T1.[imd]
+,			T1.[age]
+,			T1.[sex]
+,			T1.[ethnicity_code] 
+
+
+ 
+
+```
+
 
 ## Insert data into staging table {#ch2-sec-insert-data-into-staging-table}
 
@@ -2105,6 +2319,38 @@ GROUP BY
 ,           T1.[sex]
 ,           T1.[ethnicity_code] 
 
+
+UNION
+
+-- ICB geography
+SELECT		
+			T1.[indicator_id]
+,			CAST(LEFT(T1.[financial_year], 4) + '-04-01' AS DATE) AS start_date
+,			CAST('20' + RIGHT(T1.[financial_year], 2) + '-03-31' AS DATE) AS end_date
+,			SUM(T1.[numerator]) AS numerator
+,			CAST(NULL AS INT) AS denominator
+,			CAST(NULL AS NUMERIC) AS indicator_value
+,			CAST(NULL AS NUMERIC) AS lower_ci95
+,			CAST(NULL AS NUMERIC) AS upper_ci95
+,			T1.[imd] AS imd_code
+,			'151' AS aggregation_id -- ICB Level
+,			T1.[age] AS age_group_code
+,			T1.[sex] AS sex_code 
+,			T1.[ethnicity_code]
+,			CAST(CURRENT_TIMESTAMP AS DATE) AS creation_date
+,			'4' AS value_type_code --DASR
+,			'1' AS source_code -- SQL
+FROM		#BSOL_OF_tbStaging_NumeratorData T1
+	
+    
+GROUP BY 
+			T1.[indicator_id]
+,			CAST(LEFT(T1.[financial_year], 4) + '-04-01' AS DATE)
+,			CAST('20' + RIGHT(T1.[financial_year], 2) + '-03-31' AS DATE)
+,			T1.[imd]
+,			T1.[age]
+,			T1.[sex]
+,			T1.[ethnicity_code] 
 
 )
 
@@ -2340,7 +2586,7 @@ Metadata checklist:
 
 -   Review and update links (some broken because of change of URL in the website)
 
--   Review caveat for updates from fingertips for instance 
+-   Review caveat for updates from fingertips for instance
 
 -   Review status of indicator as some might have changed
 
