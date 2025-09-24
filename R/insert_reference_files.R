@@ -6,6 +6,9 @@ library(tidyverse)
 library(DBI)
 library(odbc)
 library(readxl)
+library(janitor)
+library(IMD)
+library(PHEindicatormethods)
 
 #1. The path to the parent work directory ----------------------------------------
 directory_path = "//mlcsu-bi-fs/csugroupdata$/Commissioning Intelligence And Strategy/BSOLCCG/Reports/02_Routine/BSOLBI_0033_Outcome_Framework_Rebuild"
@@ -29,8 +32,11 @@ geography_lookup         <- read_xlsx(reference_file_path, sheet = "geography")
 # Initial population table
 
 # Using Census
-population_reference_path <- file.path(directory_path, "Reference", "5yrAgeBandEthIMDFullPopulation.csv")
-population_reference_file <- read.csv(population2_reference_path)
+population_reference_path <- file.path(directory_path, "Reference", "census_ethnicity_imd_age_full_population.csv")
+
+population_reference_file <- read_csv(population_reference_path)
+
+population_reference_file <- clean_names(population_reference_file, case = "snake")
 
 #3. Establish SQL connection -----------------------------------------------------
 sql_connection <-
@@ -144,9 +150,6 @@ dbWriteTable(
 
 #12 Ward to IMD lookup
 
-library(IMD)
-library(PHEindicatormethods)
-
 ward_imd_lookup <- IMD::imd_england_ward %>%
   phe_quantile(Score, nquantiles = 5L, invert = TRUE) %>%
   select(ward_code, Score, quantile) %>%
@@ -160,11 +163,6 @@ dbWriteTable(
 )
 
 #13. Census population table
-
-# Clean names
-library(janitor)
-
-population_reference_file <- clean_names(population_reference_file)
 
 dbWriteTable(
   sql_connection,

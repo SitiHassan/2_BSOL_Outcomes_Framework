@@ -1,9 +1,4 @@
-library(readxl)
-library(tidyverse)
-library(tibble)
-library(DBI)
-library(odbc)
-
+# clean dates
 .to_ymd <- function(x) {
   out <- suppressWarnings({
     if (is.numeric(x)) as.Date(x, origin = "1899-12-30") else as.Date(x)
@@ -11,6 +6,7 @@ library(odbc)
   ifelse(is.na(out), NA_character_, format(out, "%Y-%m-%d"))
 }
 
+# process excel files
 process_indicator_excels <- function(
     folder_new_data,
     folder_old_data,
@@ -136,4 +132,4 @@ indicator_excels <- result$data
 dbWriteTable(sql_connection,
              name = Id(schema = "OF", table = "OF2_Indicator_Sharepoint_Data"),
              value = indicator_excels,
-             overwrite = TRUE)
+             append = TRUE)

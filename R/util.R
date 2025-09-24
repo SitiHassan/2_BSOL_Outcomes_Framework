@@ -153,85 +153,6 @@ calculate_dsr2 <-
 
 
 
-dsr_inner2 <-
-  function (data, x, n, stdpop, type, confidence, multiplier, rtn_nonindependent_vardsr = FALSE,
-            use_nonindependent_vardsr = FALSE) {
-    if (isTRUE(rtn_nonindependent_vardsr) && ("custom_vardsr" %in%
-                                              names(data) || isTRUE(use_nonindependent_vardsr))) {
-      stop("cannot get nonindependent vardsr and use nonindependent vardsr in the same execution")
-    }
-    confidence[confidence >= 90] <- confidence[confidence >=
-                                                 90]/100
-    conf1 <- confidence[1]
-    conf2 <- confidence[2]
-    if (!use_nonindependent_vardsr) {
-      method = "Dobson"
-      data <- data %>% mutate(custom_vardsr = NA_real_)
-    }
-    else {
-      method = "Dobson, with confidence adjusted for non-independent events"
-    }
-    dsrs <- data %>% mutate(wt_rate = PHEindicatormethods:::na.zero(.data$x) * .data$stdpop/.data$n,
-                            sq_rate = PHEindicatormethods:::na.zero(.data$x) * (.data$stdpop/(.data$n))^2,
-    ) %>% summarise(total_count = sum(.data$x, na.rm = TRUE),
-                    total_pop = sum(.data$n), value = sum(.data$wt_rate)/sum(.data$stdpop) *
-                      multiplier, vardsr = case_when(isTRUE(use_nonindependent_vardsr) ~
-                                                       unique(.data$custom_vardsr), .default = 1/sum(.data$stdpop)^2 *
-                                                       sum(.data$sq_rate)), .groups = "keep")
-    if (!rtn_nonindependent_vardsr) {
-      dsrs <- mutate(ungroup(dsrs), lowercl = .data$value +
-                       sqrt(.data$vardsr/.data$total_count) * (PHEindicatormethods:::byars_lower(.data$total_count,
-                                                                                                 conf1) - .data$total_count) * multiplier, uppercl = .data$value +
-                       sqrt(.data$vardsr/.data$total_count) * (PHEindicatormethods:::byars_upper(.data$total_count,
-                                                                                                 conf1) - .data$total_count) * multiplier, lower99_8cl = .data$value +
-                       sqrt(.data$vardsr/.data$total_count) * (PHEindicatormethods:::byars_lower(.data$total_count,
-                                                                                                 0.998) - .data$total_count) * multiplier, upper99_8cl = .data$value +
-                       sqrt(.data$vardsr/.data$total_count) * (PHEindicatormethods:::byars_upper(.data$total_count,
-                                                                                                 0.998) - .data$total_count) * multiplier) %>%
-        mutate(confidence = paste0(confidence * 100, "%",
-                                   collapse = ", "), statistic = paste("dsr per",
-                                                                       format(multiplier, scientific = FALSE)), method = method)
-      if (!is.na(conf2)) {
-        names(dsrs)[names(dsrs) == "lowercl"] <- "lower95_0cl"
-        names(dsrs)[names(dsrs) == "uppercl"] <- "upper95_0cl"
-      }
-      else {
-        dsrs <- dsrs %>% select(!c("lower99_8cl", "upper99_8cl"))
-      }
-      # dsrs <- dsrs %>% mutate(across(c("value", starts_with("upper"),
-      #                                  starts_with("lower")), function(x) if_else(.data$total_count <
-      #                                                                               10, NA_real_, x))
-      #                         , statistic = if_else(.data$total_count < 10, "dsr NA for total count < 10", .data$statistic))
-    }
-    if (rtn_nonindependent_vardsr) {
-      dsrs <- dsrs %>% select(group_cols(), "vardsr")
-    }
-    else if (type == "lower") {
-      dsrs <- dsrs %>% select(!c("total_count", "total_pop",
-                                 "value", starts_with("upper"), "vardsr",
-                                 "confidence", "statistic", "method"))
-    }
-    else if (type == "upper") {
-      dsrs <- dsrs %>% select(!c("total_count", "total_pop",
-                                 "value", starts_with("lower"), "vardsr",
-                                 "confidence", "statistic", "method"))
-    }
-    else if (type == "value") {
-      dsrs <- dsrs %>% select(!c("total_count", "total_pop",
-                                 starts_with("lower"), starts_with("upper"),
-                                 "vardsr", "confidence", "statistic",
-                                 "method"))
-    }
-    else if (type == "standard") {
-      dsrs <- dsrs %>% select(!c("vardsr", "confidence",
-                                 "statistic", "method"))
-    }
-    else if (type == "full") {
-      dsrs <- dsrs %>% select(!c("vardsr"))
-    }
-    return(dsrs)
-  }
-
 # calculate_dsr3 ---------------------------------------------------------------
 # This function allows the multiplier argument to be passed as a column name
 
@@ -385,7 +306,7 @@ calculate_dsr3 <-
     return(dsrs)
   }
 
-
+# dsr_inner2 --------------------------------------------------------------------
 dsr_inner2 <-
   function (data, x, n, stdpop, type, confidence,
             rtn_nonindependent_vardsr = FALSE,
@@ -494,3 +415,5 @@ dsr_inner2 <-
 
     return(dsrs)
   }
+
+
