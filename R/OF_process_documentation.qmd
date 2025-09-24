@@ -979,14 +979,14 @@ WHERE T2.[aggregation_type] = 'Locality (registered)'
 
 When updating the `aggregation_id` column, the **`aggregation_id`** can be obtained by joining data based on the aggregation type (PCN, ICB, or Locality (registered)) and/or the aggregation code (PCN or ICB code).
 
-## Create additional datasets  {#ch1-sec-create-additional-datasets}
+## Create additional datasets {#ch1-sec-create-additional-datasets}
 
 If the dataset that you're working with has ethnicity or IMD splits, we would like you to create additional datasets in the following combinations to enable calculation of values by IMD only, ethnicity only, IMD and ethnicity (already built in the previous step), and with no IMD and ethnicity splits to get overall values.
 
 **Summary of required combinations:**
 
 | Combination | Sex | Age      | IMD      | Ethnicity      | Split                  |
-|------------|------------|------------|------------|------------|---------------|
+|------------|------------|------------|------------|------------|------------|
 | 1           | 999 | age_code | imd_code | ethnicity_code | both ethnicity and IMD |
 | 2           | 999 | age_code | imd_code | 999            | imd only               |
 | 3           | 999 | age_code | 999      | ethnicity_code | ethnicity only         |
@@ -994,30 +994,30 @@ If the dataset that you're working with has ethnicity or IMD splits, we would li
 
 : Aggregated datasets to be prepared before inserting data into the final.
 
-Create a temporary table for each combination and union all additional datasets with the dataset built previously. Then, insert them into the final destination table. 
+Create a temporary table for each combination and union all additional datasets with the dataset built previously. Then, insert them into the final destination table.
 
 **Summary**:
 
-1. **Does my data have ethnicity and IMD?** If yes then you need **4** splits,
- 
-- Ethnicity and IMD in your group by
-- Ethnicity only (IMD = '999')
-- IMD only (Ethnicity = '999')
-- Neither in the grouping (IMD and Ethnicity = '999')
+1.  **Does my data have ethnicity and IMD?** If yes then you need **4** splits,
 
-2. **Does my data have ethnicity but not IMD?** If yes then you need **2** splits,
+-   Ethnicity and IMD in your group by
+-   Ethnicity only (IMD = '999')
+-   IMD only (Ethnicity = '999')
+-   Neither in the grouping (IMD and Ethnicity = '999')
 
-- Ethnicity only (IMD = '999')
-- Neither in the grouping (IMD and Ethnicity = '999')
+2.  **Does my data have ethnicity but not IMD?** If yes then you need **2** splits,
 
-3. **Does my data have IMD but not ethnicity?** If yes then you need **2** splits,
+-   Ethnicity only (IMD = '999')
+-   Neither in the grouping (IMD and Ethnicity = '999')
 
-- IMD Only (Ethnicity = '999')
-- Neither in the grouping (IMD and Ethnicity = '999')
+3.  **Does my data have IMD but not ethnicity?** If yes then you need **2** splits,
 
-4. **Does my data have neither IMD or Ethnicity?** If yes then you have **1** split,
+-   IMD Only (Ethnicity = '999')
+-   Neither in the grouping (IMD and Ethnicity = '999')
 
-- Neither in the grouping (IMD and Ethnicity = '999')
+4.  **Does my data have neither IMD or Ethnicity?** If yes then you have **1** split,
+
+-   Neither in the grouping (IMD and Ethnicity = '999')
 
 ## Update destination table {#ch1-sec-update-final-table}
 
@@ -1135,7 +1135,6 @@ CREATE TABLE    #BSOL_OF_tbIndicator_PtsCohort_IP (episode_id BIGINT NOT NULL)
 
 Alternatively, you can use the static table below, which stores the inpatient admissions episode IDs of all BSOL patients extracted from both historic SEM SUS data extracts (from April 2015 to March 2018) and current and live SUS+ data extracts (from April 2018 onward), to derive numerators. The original SQL script to create this table is `SQL > SUS > Episode ID Table Creation.sql`.
 
-
 ```{sql}
 #| connection: sql_connection
 #| code-fold: true
@@ -1143,7 +1142,6 @@ Alternatively, you can use the static table below, which stores the inpatient ad
 #| eval: false
 SELECT TOP 1000 * FROM EAT_Reporting_BSOL.Development.BSOL_BI_0033_SUS_IP_Episodes
 ```
-
 
 ### Temporary table for numerator data {#ch2-sec-temporary-table-for-numerator-data}
 
@@ -1246,7 +1244,6 @@ AND             T2.OSLAUA  IN ('E08000025', 'E08000029')                    --Bh
 ```
 
 Alternatively, you can skip this step and move to the next step if you're using this static table `EAT_Reporting_BSOL.Development.BSOL_BI_0033_SUS_IP_Episodes` to derive numerators, since it is already filtered to include data for BSOL patients within the specified time periods.
-
 
 ## Extract numerator {#ch2-sec-extract-numerator}
 
@@ -2062,7 +2059,6 @@ GROUP BY
 
 ```
 
-
 ### Locality (resident) geography {#ch2-sec-locality-resident-geography}
 
 ```{sql}
@@ -2185,7 +2181,6 @@ GROUP BY
  
 
 ```
-
 
 ## Insert data into staging table {#ch2-sec-insert-data-into-staging-table}
 
@@ -2363,7 +2358,7 @@ We would like to create additional datasets in the following combinations to ena
 **Summary of required combinations:**
 
 | Combination | Sex | Age      | IMD      | Ethnicity      | Split                  |
-|------------|------------|------------|------------|------------|---------------|
+|------------|------------|------------|------------|------------|------------|
 | 1           | 999 | age_code | imd_code | ethnicity_code | both ethnicity and IMD |
 | 2           | 999 | age_code | imd_code | 999            | imd only               |
 | 3           | 999 | age_code | 999      | ethnicity_code | ethnicity only         |
@@ -2373,26 +2368,26 @@ We would like to create additional datasets in the following combinations to ena
 
 **Summary**:
 
-1. **Does my data have ethnicity and IMD?** If yes then you need **4** splits,
- 
-- Ethnicity and IMD in your group by
-- Ethnicity only (IMD = '999')
-- IMD only (Ethnicity = '999')
-- Neither in the grouping (IMD and Ethnicity = '999')
+1.  **Does my data have ethnicity and IMD?** If yes then you need **4** splits,
 
-2. **Does my data have ethnicity but not IMD?** If yes then you need **2** splits,
+-   Ethnicity and IMD in your group by
+-   Ethnicity only (IMD = '999')
+-   IMD only (Ethnicity = '999')
+-   Neither in the grouping (IMD and Ethnicity = '999')
 
-- Ethnicity only (IMD = '999')
-- Neither in the grouping (IMD and Ethnicity = '999')
+2.  **Does my data have ethnicity but not IMD?** If yes then you need **2** splits,
 
-3. **Does my data have IMD but not ethnicity?** If yes then you need **2** splits,
+-   Ethnicity only (IMD = '999')
+-   Neither in the grouping (IMD and Ethnicity = '999')
 
-- IMD Only (Ethnicity = '999')
-- Neither in the grouping (IMD and Ethnicity = '999')
+3.  **Does my data have IMD but not ethnicity?** If yes then you need **2** splits,
 
-4. **Does my data have neither IMD or Ethnicity?** If yes then you have **1** split,
+-   IMD Only (Ethnicity = '999')
+-   Neither in the grouping (IMD and Ethnicity = '999')
 
-- Neither in the grouping (IMD and Ethnicity = '999')
+4.  **Does my data have neither IMD or Ethnicity?** If yes then you have **1** split,
+
+-   Neither in the grouping (IMD and Ethnicity = '999')
 
 This step enables the calculation of rates (or other metrics) by ethnicity only; therefore, the IMD column is collapsed to “All.”
 
@@ -3469,7 +3464,7 @@ We would like to create additional datasets in the following combinations to ena
 **Summary of required combinations:**
 
 | Combination | Sex | Age      | IMD      | Ethnicity      | Split                  |
-|------------|------------|------------|------------|------------|---------------|
+|------------|------------|------------|------------|------------|------------|
 | 1           | 999 | age_code | imd_code | ethnicity_code | both ethnicity and IMD |
 | 2           | 999 | age_code | imd_code | 999            | imd only               |
 | 3           | 999 | age_code | 999      | ethnicity_code | ethnicity only         |
@@ -3479,26 +3474,26 @@ We would like to create additional datasets in the following combinations to ena
 
 **Summary**:
 
-1. **Does my data have ethnicity and IMD?** If yes then you need **4** splits,
- 
-- Ethnicity and IMD in your group by
-- Ethnicity only (IMD = '999')
-- IMD only (Ethnicity = '999')
-- Neither in the grouping (IMD and Ethnicity = '999')
+1.  **Does my data have ethnicity and IMD?** If yes then you need **4** splits,
 
-2. **Does my data have ethnicity but not IMD?** If yes then you need **2** splits,
+-   Ethnicity and IMD in your group by
+-   Ethnicity only (IMD = '999')
+-   IMD only (Ethnicity = '999')
+-   Neither in the grouping (IMD and Ethnicity = '999')
 
-- Ethnicity only (IMD = '999')
-- Neither in the grouping (IMD and Ethnicity = '999')
+2.  **Does my data have ethnicity but not IMD?** If yes then you need **2** splits,
 
-3. **Does my data have IMD but not ethnicity?** If yes then you need **2** splits,
+-   Ethnicity only (IMD = '999')
+-   Neither in the grouping (IMD and Ethnicity = '999')
 
-- IMD Only (Ethnicity = '999')
-- Neither in the grouping (IMD and Ethnicity = '999')
+3.  **Does my data have IMD but not ethnicity?** If yes then you need **2** splits,
 
-4. **Does my data have neither IMD or Ethnicity?** If yes then you have **1** split,
+-   IMD Only (Ethnicity = '999')
+-   Neither in the grouping (IMD and Ethnicity = '999')
 
-- Neither in the grouping (IMD and Ethnicity = '999')
+4.  **Does my data have neither IMD or Ethnicity?** If yes then you have **1** split,
+
+-   Neither in the grouping (IMD and Ethnicity = '999')
 
 This step enables the calculation of rates (or other values) by ethnicity only; therefore, the IMD column is collapsed to “All.”
 
@@ -3519,7 +3514,7 @@ SELECT
 ,           [start_date]
 ,           [end_date]
 ,           SUM([numerator]) AS numerator
-,           NULL AS denominator
+,           SUM([denominator]) AS denominator
 ,           NULL AS indicator_value     
 ,           NULL AS lower_ci95
 ,           NULL AS upper_ci95
@@ -3570,8 +3565,8 @@ SELECT
             [indicator_id]
 ,           [start_date]
 ,           [end_date]
-,           SUM([numerator]) AS Numerator
-,           NULL AS Denominator
+,           SUM([numerator]) AS numerator
+,           SUM([denominator]) AS denominator
 ,           NULL AS IndicatorValue     
 ,           NULL AS LowerCI95
 ,           NULL AS UpperCI95
@@ -3622,8 +3617,8 @@ SELECT
             [indicator_id]
 ,           [start_date]
 ,           [end_date]
-,           SUM([numerator]) AS Numerator
-,           NULL AS Denominator
+,           SUM([numerator]) AS numerator
+,           SUM([denominator]) AS denominator
 ,           NULL AS IndicatorValue     
 ,           NULL AS LowerCI95
 ,           NULL AS UpperCI95
