@@ -83,7 +83,7 @@ process_indicator_excels <- function(
         age_group_code  = as.integer(age_group_code),
         sex_code        = as.integer(sex_code),
         ethnicity_code  = as.integer(ethnicity_code),
-        creation_date   = as.Date(creation_date),
+        creation_date   = as.POSIXct(creation_date),
         value_type_code = as.integer(value_type_code),
         source_code     = as.integer(source_code)
       )
@@ -129,7 +129,7 @@ result <- process_indicator_excels(
 indicator_excels <- result$data
 
 # Write data into database -----------------------------------------------------
-dbWriteTable(sql_connection,
+dbWriteTable(conn,
              name = Id(schema = "OF", table = "OF2_Indicator_Sharepoint_Data"),
              value = indicator_excels,
              append = TRUE)
