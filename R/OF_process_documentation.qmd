@@ -986,7 +986,7 @@ If the dataset that you're working with has ethnicity or IMD splits, we would li
 **Summary of required combinations:**
 
 | Combination | Sex | Age      | IMD      | Ethnicity      | Split                  |
-|------------|------------|------------|------------|------------|------------|
+|-------------|-----|----------|----------|----------------|------------------------|
 | 1           | 999 | age_code | imd_code | ethnicity_code | both ethnicity and IMD |
 | 2           | 999 | age_code | imd_code | 999            | imd only               |
 | 3           | 999 | age_code | 999      | ethnicity_code | ethnicity only         |
@@ -2358,7 +2358,7 @@ We would like to create additional datasets in the following combinations to ena
 **Summary of required combinations:**
 
 | Combination | Sex | Age      | IMD      | Ethnicity      | Split                  |
-|------------|------------|------------|------------|------------|------------|
+|-------------|-----|----------|----------|----------------|------------------------|
 | 1           | 999 | age_code | imd_code | ethnicity_code | both ethnicity and IMD |
 | 2           | 999 | age_code | imd_code | 999            | imd only               |
 | 3           | 999 | age_code | 999      | ethnicity_code | ethnicity only         |
@@ -3278,7 +3278,7 @@ Note that the `aggregation_id` column now contains Local Authority registered.
 STEP 13: Create local authority registered-level dataset
 ======================================================================================================================*/
 
--- Take locality registered level data from the staging QOF data and update the local authority 
+-- Take locality registered level data from the staging NDA data and update the local authority 
 DROP TABLE IF EXISTS #la_data
 SELECT * INTO #la_data
 FROM #staging_NDA_data
@@ -3464,7 +3464,7 @@ We would like to create additional datasets in the following combinations to ena
 **Summary of required combinations:**
 
 | Combination | Sex | Age      | IMD      | Ethnicity      | Split                  |
-|------------|------------|------------|------------|------------|------------|
+|-------------|-----|----------|----------|----------------|------------------------|
 | 1           | 999 | age_code | imd_code | ethnicity_code | both ethnicity and IMD |
 | 2           | 999 | age_code | imd_code | 999            | imd only               |
 | 3           | 999 | age_code | 999      | ethnicity_code | ethnicity only         |
