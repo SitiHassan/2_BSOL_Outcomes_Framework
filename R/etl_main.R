@@ -9,10 +9,8 @@ library(tibble)
 # Start timer
 run_start <- Sys.time()
 
-# 1 Read metadata --------------------------------------------------------------
-metadata <- read_xlsx("data/metadata/metadata.xlsx")
 
-# 2) Database connection -------------------------------------------------------
+# 1) Database connection -------------------------------------------------------
 conn <- dbConnect(
   odbc(),
   Driver   = "SQL Server",
@@ -21,8 +19,14 @@ conn <- dbConnect(
   Trusted_Connection = "True"
 )
 
-# 3) Define a runner that sources functions and executes the ETL ---------------
-run_all <- function(conn, metadata) {
+# 2) Read metadata -------------------------------------------------------------
+metadata <- dbGetQuery(conn, "SELECT * FROM [EAT_Reporting_BSOL].[OF].[OF2_Reference_Metadata]")
+
+# 3) Define indicator IDs to process -------------------------------------------
+indicator_ids <- c(35, 36, 37, 38, 136, 137)
+
+# 4) Define a runner that sources functions and executes the ETL ---------------
+run_all <- function(conn, metadata, indicator_ids = NULL, table_name) {
 
   # Source function files
   source(file.path("R/utils.R")) # define calculate_dsr3
@@ -38,16 +42,26 @@ run_all <- function(conn, metadata) {
     run_sql_file(conn, "SQL/03_insert_into_staging_table.sql")
   })
 
-  # Pull fresh staging data
-  message("▶ Extracting staging data from SQL table  ...")
-  staging_data <- dbGetQuery(
-    conn,
-    "SELECT * FROM [EAT_Reporting_BSOL].[OF].[OF2_Indicator_Staging_Data]"
+  # Pull fresh staging data (optionally filtered by indicator_ids)
+  if (is.null(indicator_ids)) {
+    message("▶ Extracting ALL indicators from staging table ...")
+  } else {
+    message(sprintf("▶ Extracting %d indicator(s) from staging table ...", length(indicator_ids)))
+  }
+
+  staging_data <- get_indicators_from_sql(
+    conn        = conn,
+    table_name  = table_name,
+    indicator_ids = indicator_ids
   )
 
   # Run ETL
-  message("▶ Rrocessing indicator data ...")
-  result <- calculate_values(data = staging_data, metadata = metadata, metadata_key = "indicator_id")
+  message("▶ Processing indicator data ...")
+  result <- calculate_values(
+    data = staging_data,
+    metadata = metadata,
+    metadata_key = "indicator_id"
+    )
 
   return(list(
     result = result,
@@ -56,10 +70,13 @@ run_all <- function(conn, metadata) {
 
 }
 
-# 4) Execute and capture output -------------------------------------------------
-output <- run_all(conn = conn, metadata = metadata)
+# 5) Execute and capture output -------------------------------------------------
+output <- run_all(conn = conn,
+                  metadata = metadata,
+                  indicator_ids = indicator_ids,
+                  table_name = "[EAT_Reporting_BSOL].[OF].[OF2_Indicator_Staging_Data]")
 
-# 5) Run DQ checks -------------------------------------------------------------
+# 6) Run DQ checks -------------------------------------------------------------
 staging_data <- output$staging_data|>
   mutate(time_period_type = get_duration_label(as.Date(start_date), as.Date(end_date)))
 
@@ -73,7 +90,7 @@ run_all_dq_checks(
   show_n = 10
 )
 
-# 6) Add insertion time stamp and standardise schema ---------------------------
+# 7) Add insertion time stamp and standardise schema ---------------------------
 result <- output$result |>
   mutate(insertion_date_time = Sys.time()) |>
   mutate(
@@ -98,13 +115,17 @@ result <- output$result |>
   )
 
 
-# 7) Write output into database ------------------------------------------------
+# 8) Write output into database ------------------------------------------------
+insert_data_into_sql_table(
+  conn,
+  database = "EAT_Reporting_BSOL",
+  schema   = "OF",
+  table    = "OF2_Indicator_Processed_Data",
+  data     = result,
+  indicator_ids = indicator_ids,
+  id_column = "indicator_id"
+)
 
-dbExecute(conn, "DELETE FROM [EAT_Reporting_BSOL].[OF].[OF2_Indicator_Processed_Data]")
-dbWriteTable(conn,
-             name = Id(schema = "OF", table = "OF2_Indicator_Processed_Data"),
-             value = result,
-             append = TRUE)
 
 # End timer
 run_end <- Sys.time()
