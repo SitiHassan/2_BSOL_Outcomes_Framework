@@ -577,6 +577,76 @@ run_sql_file <- function(conn, path) {
   message("\u2705 SQL script has succesfully run!")
 }
 
+get_indicators_from_sql <- function(conn, table_name, indicator_ids = NULL) {
+  # Inputs:
+  #   conn          - Active SQL connection (e.g., from DBI::dbConnect)
+  #   table_name    - Name of the SQL table (as a string)
+  #   indicator_ids - Optional vector of indicator IDs to filter by
+
+  # Base query
+  sql_query <- paste0("SELECT * FROM ", table_name)
+
+  # Add WHERE clause if indicator_ids provided
+  if (!is.null(indicator_ids) && length(indicator_ids) > 0) {
+    # Format IDs safely for SQL (handle numeric or character)
+    if (is.numeric(indicator_ids)) {
+      id_list <- paste(indicator_ids, collapse = ", ")
+    } else {
+      id_list <- paste0("'", indicator_ids, "'", collapse = ", ")
+    }
+    sql_query <- paste0(sql_query, " WHERE Indicator_ID IN (", id_list, ")")
+  }
+
+  # Execute and return data
+  result <- DBI::dbGetQuery(conn, sql_query)
+
+  message("\u2705 Indicators extracted from SQL!")
+  return(result)
+}
+
+insert_data_into_sql_table <- function(conn, database, schema, table, data, indicator_ids = NULL,
+                                               id_column = "indicator_id") {
+  # Delete existing data and append new data
+  # Inputs:
+  #   conn          - Active SQL connection (e.g., from DBI::dbConnect)
+  #   database      - Name of database (as a string)
+  #   schema        - Name of schema (as a string)
+  #   table         - Name of the SQL table (as a string)
+  #   data          - Data frame to append to SQL
+  #   indicator_ids - Optional vector of indicator IDs to delete before appending
+
+  tbl_id  <- DBI::Id(catalog = database, schema = schema, table = table)
+  tbl_sql <- DBI::dbQuoteIdentifier(conn, tbl_id)
+
+  # Build DELETE query
+  sql_query <- paste0("DELETE FROM ", tbl_sql)
+
+  # Add WHERE clause if indicator_ids provided
+  if (!is.null(indicator_ids) && length(indicator_ids) > 0) {
+    # Format IDs safely for SQL (handle numeric or character)
+    if (is.numeric(indicator_ids)) {
+      id_list <- paste(indicator_ids, collapse = ", ")
+    } else {
+      id_list <- paste0("'", indicator_ids, "'", collapse = ", ")
+    }
+    sql_query <- paste0(sql_query, " WHERE indicator_id IN (", id_list, ")")
+  }
+
+  # Execute DELETE query
+  DBI::dbExecute(conn, sql_query)
+
+  # Append new data
+  DBI::dbWriteTable(conn, name = tbl_id, value = data, append = TRUE)
+
+
+  # Confirm success
+  if (is.null(indicator_ids)) {
+    message("\u2705 All processed indicators replaced in SQL table!")
+  } else {
+    message("\u2705 Processed indicators updated in SQL table for selected indicator_ids!")
+  }
+}
+
 # DQ functions------------------------------------------------------------------
 ## Function to check row counts ------------------------------------------------
 
