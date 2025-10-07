@@ -23,7 +23,7 @@ conn <- dbConnect(
 metadata <- dbGetQuery(conn, "SELECT * FROM [EAT_Reporting_BSOL].[OF].[OF2_Reference_Metadata]")
 
 # 3) Define indicator IDs to process -------------------------------------------
-indicator_ids <- c(35, 36, 37, 38, 136, 137)
+indicator_ids <- c(10, 11, 6, 7, 121, 134, 16)
 
 # 4) Define a runner that sources functions and executes the ETL ---------------
 run_all <- function(conn, metadata, indicator_ids = NULL, table_name) {
