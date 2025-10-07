@@ -416,4 +416,10 @@ dsr_inner2 <-
     return(dsrs)
   }
 
+stat_mode <- function(x) {
+  tx <- table(x, useNA = "no")              # count frequency of each unique value
+  if (!length(tx)) return(NA_character_)    # handle empty input gracefully
+  names(tx)[which.max(tx)]                  # return the name (value) with max frequency
+}
+
 
