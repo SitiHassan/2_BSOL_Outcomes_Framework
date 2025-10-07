@@ -55,7 +55,7 @@ time_period_5yrs <- data.frame(
 #   - If custom window tables are provided, they must have integer `from`/`to` years.
 
 
-create_pooled_with_ranges <- function(df, ks = c(3,5), time_period_3yrs = NULL, time_period_5yrs = NULL) {
+create_pooled_with_ranges <- function(df, ks = c(3,5), POOL_KEYS, time_period_3yrs = NULL, time_period_5yrs = NULL) {
 
   # Select only indicators which use Census as denominator source
   df <- df |> filter(population_type == "Census")
@@ -276,6 +276,77 @@ get_duration_label <- function(start_date, end_date) {
   )
 }
 
+# Function to exclude incomplete data ------------------------------------------
+# Automatically exclude incomplete data cycles (e.g., financial, calendar, or other)
+# based on the typical end date (mode month-day) and typical duration between start and end dates.
+exclude_incomplete_data <- function(
+    df,
+    year_type_col, # column name: year type (e.g., "Calendar", "Financial", "Other")
+    start_date_col, # column name: start date
+    end_date_col, # column name: end date
+    time_period_col = NULL, # optional column name for time period type (e.g., "1 year", "3 year pooled")
+    current_date = Sys.Date(), # current date reference for detecting incomplete cycles
+    enforce_duration = TRUE, # whether to filter by typical duration
+    tolerance_days = 5L  # allowed deviation (days) from typical duration
+) {
+  # Capture column names for tidy evaluation
+  year_type <- rlang::ensym(year_type_col)
+  start_date <- rlang::ensym(start_date_col)
+  end_date <- rlang::ensym(end_date_col)
+  time_period <- if (!is.null(time_period_col)) rlang::ensym(time_period_col) else NULL
+
+  # Standardize year type and time period text for grouping
+  df2 <- df |>
+    mutate(
+      yt_lower = stringr::str_to_lower(as.character(!!year_type)),
+      tp_lower = if (!is.null(time_period)) stringr::str_to_lower(as.character(!!time_period)) else NA_character_
+    )
+
+  # Determine which columns to group by (year type + optional time period)
+  group_keys <- c("yt_lower", if (!is.null(time_period)) "tp_lower" else NULL)
+
+  meta <- df2 |>
+    filter(!is.na(!!end_date), !!end_date <= current_date) |> # keep only past data
+    mutate(
+      mmdd = format(!!end_date, "%m-%d"),  # extract month-day part of end date
+      duration_days = if_else(!is.na(!!start_date), as.numeric(!!end_date - !!start_date) + 1, NA_real_)
+    ) |>
+    group_by(across(all_of(group_keys))) |>
+    summarise(
+      end_mmdd = stat_mode(mmdd), # most common end month-day (e.g., 03-31)
+      typical_duration = stats::median(duration_days, na.rm = TRUE), # median number of days per cycle
+      .groups = "drop"
+    )
+
+  df2 |>
+    left_join(meta, by = group_keys) |>  # Join metadata back to the original data and filter incomplete periods
+    mutate(
+      end_mmdd = coalesce(end_mmdd, "12-31"), # Default to Dec 31 if no mode end date found
+      # Construct this year's expected cycle end date
+      cycle_end_this_year = as.Date(sprintf("%d-%s", lubridate::year(current_date), end_mmdd)),
+      # If this year’s cycle hasn’t ended yet, use last year’s end date
+      latest_cycle_end = if_else(
+        cycle_end_this_year <= current_date, cycle_end_this_year,
+        as.Date(sprintf("%d-%s", lubridate::year(current_date) - 1L, end_mmdd))
+      ),
+      # Calculate actual duration for each record
+      duration_days = if_else(!is.na(!!start_date) & !is.na(!!end_date),
+                                     as.numeric(!!end_date - !!start_date) + 1, NA_real_),
+      # Check if duration is within the expected tolerance range
+      duration_ok = if_else(
+        enforce_duration & !is.na(typical_duration) & !is.na(duration_days),
+        abs(duration_days - typical_duration) <= tolerance_days,
+        TRUE
+      )
+    ) |>
+    # Keep only rows that end on or before the latest completed cycle and have valid duration
+    filter(!is.na(!!end_date), !!end_date <= latest_cycle_end, duration_ok) |>
+    # Remove temporary helper columns
+    select(-yt_lower, -tp_lower, -cycle_end_this_year)
+}
+
+
+
 # Function to calculate percentage ---------------------------------------------
 
 calc_percentage <- function(df_in){
@@ -328,7 +399,12 @@ calc_crude_or_ratio <- function(df_in){
       multiplier = multiplier
     ) |>
     mutate(numerator = num_abs * num_sign,
-           value = value * num_sign)
+           value = value * num_sign,
+           lower_tmp = pmin(lowercl, uppercl),
+           upper_tmp = pmax(lowercl, uppercl),
+           lowercl   = if_else(num_sign < 0, -upper_tmp, lower_tmp),
+           uppercl   = if_else(num_sign < 0, -lower_tmp, upper_tmp)) |>
+    select(-lower_tmp, -upper_tmp)
 
   return(output)
 }
@@ -456,9 +532,16 @@ calculate_values <- function(data, metadata, metadata_key = "indicator_id"){
   df <- df |>
       left_join(metadata2, by = setNames(metadata_key, metadata_key))
 
+  # Exclude incomplete data
+  df <- exclude_incomplete_data(df = df, year_type_col = "year_type",
+                                    start_date_col = "start_date", end_date_col = "end_date",
+                                    time_period_col = "time_period_type",
+                                    current_date = Sys.Date(), enforce_duration = FALSE, tolerance_days = 5L)
+
+
   # Create 3 and 5 year pooled data
   message("▶ Creating 3 and 5 year pooled data...")
-  pooled_df <- create_pooled_with_ranges(df, ks = c(3,5)) |>
+  pooled_df <- create_pooled_with_ranges(df, ks = c(3,5), POOL_KEYS = POOL_KEYS) |>
     left_join(metadata2, by = setNames(metadata_key, metadata_key))
 
   # Combine pooled data with yearly data
