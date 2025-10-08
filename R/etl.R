@@ -752,6 +752,7 @@ get_indicators_from_sql <- function(conn, table_name, indicator_ids = NULL) {
   # Execute
   result <- DBI::dbGetQuery(conn, sql_query)
   message("\u2705 Indicators extracted from SQL!")
+  print(paste("Total rows for data extracted:", nrow(result)))
   result
 }
 
