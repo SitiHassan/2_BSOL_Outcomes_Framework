@@ -22,37 +22,37 @@ conn <- dbConnect(
 # 2) Read metadata -------------------------------------------------------------
 metadata <- dbGetQuery(conn, "SELECT * FROM [EAT_Reporting_BSOL].[OF].[OF2_Reference_Metadata]")
 
-# 3) Define indicator IDs to process -------------------------------------------
-indicator_ids <- c(10, 11, 6, 7, 121, 134, 16)
 
-# 4) Define a runner that sources functions and executes the ETL ---------------
-run_all <- function(conn, metadata, indicator_ids = NULL, table_name) {
-
+# 3) Define a runner that sources functions and executes the ETL ---------------
+run_all <- function(conn, metadata, indicator_ids = "All", table_name) {
   # Source function files
-  source(file.path("R/utils.R")) # define calculate_dsr3
-  source(file.path("R/etl.R")) # define calculate_values, check_row_counts
+  source(file.path("R/utils.R"))
+  source(file.path("R/etl.R"))
 
   # Process SharePoint data
   message("▶ Processing Sharepoint data ...")
   source(file.path("R/insert_sharepoint_data.R"))
 
-  # Combine latest data from multiple sources
+  # Combine latest data
   message("▶ Combining latest data from multiple sources in SQL ...")
   dbWithTransaction(conn, {
     run_sql_file(conn, "SQL/03_insert_into_staging_table.sql")
   })
 
-  # Pull fresh staging data (optionally filtered by indicator_ids)
-  if (is.null(indicator_ids)) {
+  #  Normalize indicator_ids
+  ids <- normalize_indicator_ids(indicator_ids)
+
+  # Pull fresh staging data (optionally filtered)
+  if (is.null(ids) || length(ids) == 0) {
     message("▶ Extracting ALL indicators from staging table ...")
   } else {
-    message(sprintf("▶ Extracting %d indicator(s) from staging table ...", length(indicator_ids)))
+    message(sprintf("▶ Extracting %d indicator(s) from staging table ...", length(ids)))
   }
 
   staging_data <- get_indicators_from_sql(
-    conn        = conn,
-    table_name  = table_name,
-    indicator_ids = indicator_ids
+    conn         = conn,
+    table_name   = table_name,
+    indicator_ids = ids
   )
 
   # Run ETL
@@ -61,27 +61,28 @@ run_all <- function(conn, metadata, indicator_ids = NULL, table_name) {
     data = staging_data,
     metadata = metadata,
     metadata_key = "indicator_id"
-    )
+  )
 
-  return(list(
+  list(
     result = result,
     staging_data = staging_data
-  ))
-
+  )
 }
 
-# 5) Execute and capture output -------------------------------------------------
+
+# 4) Execute and capture output -------------------------------------------------
 output <- run_all(conn = conn,
                   metadata = metadata,
-                  indicator_ids = indicator_ids,
+                  indicator_ids = "All", # or a vector of numeric/char ids or single comma-separated string like "10, 11, 12"
                   table_name = "[EAT_Reporting_BSOL].[OF].[OF2_Indicator_Staging_Data]")
 
-# 6) Run DQ checks -------------------------------------------------------------
+
+# 5) Run DQ checks -------------------------------------------------------------
 staging_data <- output$staging_data|>
   mutate(time_period_type = get_duration_label(as.Date(start_date), as.Date(end_date)))
 
 run_all_dq_checks(
-  df = output$result|>
+  df = output$result$combined_calc_dfs|>
     filter(time_period_type == "1 year" & value_type_code %in% c(2, 3, 7)),
   reference_data = staging_data |>
     filter(time_period_type == "1 year" & value_type_code %in% c(2, 3, 7)),
@@ -90,8 +91,8 @@ run_all_dq_checks(
   show_n = 10
 )
 
-# 7) Add insertion time stamp and standardise schema ---------------------------
-result <- output$result |>
+# 6) Add insertion time stamp and standardise schema ---------------------------
+result <- output$result$combined_calc_dfs |>
   mutate(insertion_date_time = Sys.time()) |>
   mutate(
     indicator_id     = as.integer(indicator_id),
@@ -115,14 +116,14 @@ result <- output$result |>
   )
 
 
-# 8) Write output into database ------------------------------------------------
+# 7) Write output into database ------------------------------------------------
 insert_data_into_sql_table(
   conn,
   database = "EAT_Reporting_BSOL",
   schema   = "OF",
   table    = "OF2_Indicator_Processed_Data",
   data     = result,
-  indicator_ids = indicator_ids,
+  indicator_ids = "All",
   id_column = "indicator_id"
 )
 

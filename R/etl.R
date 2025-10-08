@@ -285,6 +285,7 @@ exclude_incomplete_data <- function(
     start_date_col, # column name: start date
     end_date_col, # column name: end date
     time_period_col = NULL, # optional column name for time period type (e.g., "1 year", "3 year pooled")
+    indicator_col = NULL,     # optional column name for indicator (e.g., "indicator_id")
     current_date = Sys.Date(), # current date reference for detecting incomplete cycles
     enforce_duration = TRUE, # whether to filter by typical duration
     tolerance_days = 5L  # allowed deviation (days) from typical duration
@@ -294,10 +295,12 @@ exclude_incomplete_data <- function(
   start_date <- rlang::ensym(start_date_col)
   end_date <- rlang::ensym(end_date_col)
   time_period <- if (!is.null(time_period_col)) rlang::ensym(time_period_col) else NULL
+  indicator   <- if (!is.null(indicator_col)) rlang::ensym(indicator_col) else NULL
 
   # Standardize year type and time period text for grouping
   df2 <- df |>
     mutate(
+      .row_id  = dplyr::row_number(), # row id for tracking
       yt_lower = stringr::str_to_lower(as.character(!!year_type)),
       tp_lower = if (!is.null(time_period)) stringr::str_to_lower(as.character(!!time_period)) else NA_character_
     )
@@ -318,7 +321,8 @@ exclude_incomplete_data <- function(
       .groups = "drop"
     )
 
-  df2 |>
+  # Compute filtered result
+  result <- df2 |>
     left_join(meta, by = group_keys) |>  # Join metadata back to the original data and filter incomplete periods
     mutate(
       end_mmdd = coalesce(end_mmdd, "12-31"), # Default to Dec 31 if no mode end date found
@@ -340,9 +344,31 @@ exclude_incomplete_data <- function(
       )
     ) |>
     # Keep only rows that end on or before the latest completed cycle and have valid duration
-    filter(!is.na(!!end_date), !!end_date <= latest_cycle_end, duration_ok) |>
-    # Remove temporary helper columns
-    select(-yt_lower, -tp_lower, -cycle_end_this_year)
+    filter(!is.na(!!end_date), !!end_date <= latest_cycle_end, duration_ok)
+
+  # Determine excluded rows (anti-join by row id)
+  excluded <- df2 |> dplyr::anti_join(result |> dplyr::select(.row_id), by = ".row_id")
+
+  # Print summary of exclusions
+  total_excluded <- nrow(excluded)
+  total_rows     <- nrow(df)
+  if (total_excluded == 0) {
+    message("No rows were excluded (0/", total_rows, ").")
+  } else {
+    message("Excluded ", total_excluded, " row(s) out of ", total_rows, ".")
+    if (!is.null(indicator)) {
+      by_indicator <- excluded |>
+        dplyr::mutate(`Indicator` = as.character(!!indicator)) |>
+        dplyr::count(`Indicator`, name = "Excluded_Rows") |>
+        dplyr::arrange(dplyr::desc(Excluded_Rows))
+      print(by_indicator)
+    }
+  }
+
+  # Return filtered data without helper columns
+  result |>
+    dplyr::select(-yt_lower, -tp_lower, -cycle_end_this_year) |>
+    dplyr::select(-.row_id)
 }
 
 
@@ -533,10 +559,11 @@ calculate_values <- function(data, metadata, metadata_key = "indicator_id"){
       left_join(metadata2, by = setNames(metadata_key, metadata_key))
 
   # Exclude incomplete data
+  message("▶ Excluding incomplete data..")
   df <- exclude_incomplete_data(df = df, year_type_col = "year_type",
                                     start_date_col = "start_date", end_date_col = "end_date",
                                     time_period_col = "time_period_type",
-                                    current_date = Sys.Date(), enforce_duration = FALSE, tolerance_days = 5L)
+                                    current_date = Sys.Date(), enforce_duration = TRUE, tolerance_days = 5L)
 
 
   # Create 3 and 5 year pooled data
@@ -643,9 +670,43 @@ calculate_values <- function(data, metadata, metadata_key = "indicator_id"){
     )
   }
 
-  message("▶ Process completed!")
-  return(output)
+  message("\u2705 Process completed!")
+  # Return a list of all dfs for tracking
+  return(list(combined_calc_dfs = output,
+              df_keep = df_keep,
+              df_skip = df_skip,
+              perc = temp1,
+              crude_ratio = temp2,
+              dasr = temp3))
 }
+
+# Function to normalise indicator ids ------------------------------------------
+# To normalise indicator ids so that function accepts either
+# "All" / "all" / "*" : process all indicators, or
+# a vector of IDs (numeric or character), or
+# a single comma-separated string like "10, 11, 12"
+# especially useful when specifying which ids to extract from SQL using
+# get_indicators_from_sql function and which ids to process using run_all function
+
+normalize_indicator_ids <- function(indicator_ids) {
+  # Treat NULL or "all"/"*"(any case) as no filter
+  if (is.null(indicator_ids)) return(NULL)
+  if (is.character(indicator_ids) && length(indicator_ids) == 1) {
+    if (tolower(indicator_ids) %in% c("all", "*")) return(NULL)
+    # If a single comma-separated string, split it
+    if (grepl(",", indicator_ids)) {
+      indicator_ids <- trimws(unlist(strsplit(indicator_ids, ",")))
+    }
+  }
+  # Coerce numerics when possible; keep characters that aren't numeric
+  suppressWarnings({
+    as_num <- suppressWarnings(as.numeric(indicator_ids))
+  })
+  out <- ifelse(!is.na(as_num), as_num, indicator_ids)
+  out <- unique(out)
+  out[!is.na(out) & out != ""]
+}
+
 
 # Function to run SQL script ---------------------------------------------------
 run_sql_file <- function(conn, path) {
@@ -660,32 +721,24 @@ run_sql_file <- function(conn, path) {
   message("\u2705 SQL script has succesfully run!")
 }
 
+# To extract indicators from sql table
 get_indicators_from_sql <- function(conn, table_name, indicator_ids = NULL) {
-  # Inputs:
-  #   conn          - Active SQL connection (e.g., from DBI::dbConnect)
-  #   table_name    - Name of the SQL table (as a string)
-  #   indicator_ids - Optional vector of indicator IDs to filter by
-
   # Base query
   sql_query <- paste0("SELECT * FROM ", table_name)
 
-  # Add WHERE clause if indicator_ids provided
+  # WHERE clause if IDs provided
   if (!is.null(indicator_ids) && length(indicator_ids) > 0) {
-    # Format IDs safely for SQL (handle numeric or character)
-    if (is.numeric(indicator_ids)) {
-      id_list <- paste(indicator_ids, collapse = ", ")
-    } else {
-      id_list <- paste0("'", indicator_ids, "'", collapse = ", ")
-    }
-    sql_query <- paste0(sql_query, " WHERE Indicator_ID IN (", id_list, ")")
+    # Quote each literal safely for this connection (handles numbers/strings)
+    quoted <- vapply(indicator_ids, DBI::dbQuoteLiteral, character(1), conn = conn)
+    sql_query <- paste0(sql_query, " WHERE Indicator_ID IN (", paste(quoted, collapse = ", "), ")")
   }
 
-  # Execute and return data
+  # Execute
   result <- DBI::dbGetQuery(conn, sql_query)
-
   message("\u2705 Indicators extracted from SQL!")
-  return(result)
+  result
 }
+
 
 insert_data_into_sql_table <- function(conn, database, schema, table, data, indicator_ids = NULL,
                                                id_column = "indicator_id") {
@@ -698,35 +751,30 @@ insert_data_into_sql_table <- function(conn, database, schema, table, data, indi
   #   data          - Data frame to append to SQL
   #   indicator_ids - Optional vector of indicator IDs to delete before appending
 
+  # Normalize the ids (NULL or "all"/"*" to delete all rows or certain ids)
+  ids <- normalize_indicator_ids(indicator_ids)
+
   tbl_id  <- DBI::Id(catalog = database, schema = schema, table = table)
   tbl_sql <- DBI::dbQuoteIdentifier(conn, tbl_id)
+  col_sql <- DBI::dbQuoteIdentifier(conn, id_column)
 
-  # Build DELETE query
+  # Build DELETE
   sql_query <- paste0("DELETE FROM ", tbl_sql)
+  if (!is.null(ids) && length(ids) > 0) {
+    # Quote each literal (works for numbers and strings)
+    quoted_vals <- vapply(ids, DBI::dbQuoteLiteral, character(1), conn = conn)
+    sql_query <- paste0(sql_query, " WHERE ", col_sql, " IN (", paste(quoted_vals, collapse = ", "), ")")
+  } # else: NULL/empty then delete ALL rows in the table
 
-  # Add WHERE clause if indicator_ids provided
-  if (!is.null(indicator_ids) && length(indicator_ids) > 0) {
-    # Format IDs safely for SQL (handle numeric or character)
-    if (is.numeric(indicator_ids)) {
-      id_list <- paste(indicator_ids, collapse = ", ")
-    } else {
-      id_list <- paste0("'", indicator_ids, "'", collapse = ", ")
-    }
-    sql_query <- paste0(sql_query, " WHERE indicator_id IN (", id_list, ")")
-  }
-
-  # Execute DELETE query
+  # Execute DELETE and append
   DBI::dbExecute(conn, sql_query)
-
-  # Append new data
   DBI::dbWriteTable(conn, name = tbl_id, value = data, append = TRUE)
 
-
-  # Confirm success
-  if (is.null(indicator_ids)) {
-    message("\u2705 All processed indicators replaced in SQL table!")
+  # Messages
+  if (is.null(ids) || length(ids) == 0) {
+    message("\u2705 All rows deleted and new data appended to ", DBI::dbQuoteIdentifier(conn, DBI::Id(schema=schema, table=table)), ".")
   } else {
-    message("\u2705 Processed indicators updated in SQL table for selected indicator_ids!")
+    message("\u2705 Deleted and replaced data for selected indicator_ids in ", DBI::dbQuoteIdentifier(conn, DBI::Id(schema=schema, table=table)), ".")
   }
 }
 
