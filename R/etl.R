@@ -16,22 +16,38 @@ require_pooled_data <- function(metadata) {
   return(ids)
 }
 
-# Keys to pool data by
+# Global keys to pool data by
 POOL_KEYS <- c(
   "indicator_id","imd_code","aggregation_id",
   "age_group_code","sex_code","ethnicity_code",
   "creation_date","value_type_code","source_code","combination_id"
 )
 
-time_period_3yrs <- data.frame(
-  from = c(2014,2015,2016,2017,2018,2019,2020,2021,2022),
-  to   = c(2016,2017,2018,2019,2020,2021,2022,2023,2024)
-)
+# Function to generate year series ---------------------------------------------
+generate_year_series <- function(min_year, max_year, span_years = 3L) {
+  stopifnot(is.numeric(min_year), is.numeric(max_year), is.numeric(span_years))
+  min_year     <- as.integer(min_year)
+  max_year     <- as.integer(max_year)
+  window_years <- as.integer(span_years)
+  if (window_years < 1L) stop("span_years must be >= 1")
 
-time_period_5yrs <- data.frame(
-  from = c(2014,2015,2016,2017,2018,2019,2020),
-  to   = c(2018,2019,2020,2021,2022,2023,2024)
-)
+  gap <- window_years - 1L
+  if ((max_year - min_year) < gap) {
+    return(data.frame(from = integer(0), to = integer(0), k = integer(0)))
+  }
+
+  starts <- seq.int(min_year, max_year - gap)
+  data.frame(
+    from = starts,
+    to   = starts + gap,
+    k    = window_years
+  )
+}
+
+# Example
+# generate_year_series(2014, 2024, 3)
+#
+# generate_year_series(2014, 2024, 5)
 
 # Function to create pooled data -----------------------------------------------
 # Inputs:
