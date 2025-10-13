@@ -38,6 +38,13 @@ population_reference_file <- read_csv(population_reference_path)
 
 population_reference_file <- clean_names(population_reference_file, case = "snake")
 
+# Metadata
+
+metadata <- read_xlsx("data/metadata/metadata.xlsx")
+
+metadata <- janitor::clean_names(metadata, case = "snake") |>
+  select(-in_destination_table_internal_use_only)
+
 #3. Establish SQL connection -----------------------------------------------------
 sql_connection <-
   dbConnect(
@@ -170,3 +177,11 @@ dbWriteTable(
   population_reference_file,
   overwrite = TRUE
 )
+
+#14. Metadata
+
+
+dbWriteTable(sql_connection,
+             name = Id(schema = "OF", table = "OF2_Reference_Metadata"),
+             value = metadata,
+             overwrite = TRUE)
