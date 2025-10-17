@@ -596,10 +596,10 @@ calculate_values <- function(data, metadata, metadata_key = "indicator_id"){
   message("▶ Determining rows requiring calculations...")
   needs_calc <- is.na(all_df$indicator_value) & (!is.na(all_df$denominator) & all_df$denominator != 0)
 
-  # Only process where status_code == 1 AND multiplier is present
+  # Only process where status_code == 1 or 2 AND multiplier is present
   eligible_for_processing <- needs_calc &
     !is.na(all_df$multiplier) &
-    all_df$status_code == 1 &
+    all_df$status_code %in% c(1,2) &
     !is.na(all_df$value_type_code)
 
   # To be calculated
