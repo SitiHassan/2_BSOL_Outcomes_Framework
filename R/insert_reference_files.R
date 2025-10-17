@@ -56,7 +56,7 @@ sql_connection <-
   )
 
 #4. Write tables -----------------------------------------------------------------
-#1 Sex
+#1 Sex -------------
 
 dbWriteTable(
   sql_connection,
@@ -65,7 +65,7 @@ dbWriteTable(
   overwrite = TRUE
 )
 
-#2 Age
+#2 Age -------------
 
 dbWriteTable(
   sql_connection,
@@ -74,7 +74,7 @@ dbWriteTable(
   overwrite = TRUE
 )
 
-#3 IMD
+#3 IMD -------------
 
 dbWriteTable(
   sql_connection,
@@ -83,7 +83,7 @@ dbWriteTable(
   overwrite = TRUE
 )
 
-#4 Ethnicity
+#4 Ethnicity -------------
 
 dbWriteTable(
   sql_connection,
@@ -92,7 +92,7 @@ dbWriteTable(
   overwrite = TRUE
 )
 
-#5 Polarity
+#5 Polarity -------------
 
 dbWriteTable(
   sql_connection,
@@ -101,7 +101,7 @@ dbWriteTable(
   overwrite = TRUE
 )
 
-#6 Value Type
+#6 Value Type -------------
 
 dbWriteTable(
   sql_connection,
@@ -110,7 +110,7 @@ dbWriteTable(
   overwrite = TRUE
 )
 
-#7 Source
+#7 Source -------------
 
 dbWriteTable(
   sql_connection,
@@ -119,7 +119,7 @@ dbWriteTable(
   overwrite = TRUE
 )
 
-#8 Geography
+#8 Geography -------------
 
 dbWriteTable(
   sql_connection,
@@ -128,7 +128,7 @@ dbWriteTable(
   overwrite = TRUE
 )
 
-#9 Domain
+#9 Domain -------------
 
 dbWriteTable(
   sql_connection,
@@ -137,7 +137,7 @@ dbWriteTable(
   overwrite = TRUE
 )
 
-#10 Status
+#10 Status ------------
 
 dbWriteTable(
   sql_connection,
@@ -146,7 +146,7 @@ dbWriteTable(
   overwrite = TRUE
 )
 
-#11 Indicator list
+#11 Indicator list ---------
 
 dbWriteTable(
   sql_connection,
@@ -155,7 +155,7 @@ dbWriteTable(
   overwrite = TRUE
 )
 
-#12 Ward to IMD lookup
+#12 Ward to IMD lookup -----------
 
 ward_imd_lookup <- IMD::imd_england_ward %>%
   phe_quantile(Score, nquantiles = 5L, invert = TRUE) %>%
@@ -169,7 +169,7 @@ dbWriteTable(
   overwrite = TRUE
 )
 
-#13. Census population table
+#13. Census population table -----------
 
 dbWriteTable(
   sql_connection,
@@ -178,7 +178,7 @@ dbWriteTable(
   overwrite = TRUE
 )
 
-#14. Metadata
+#14. Metadata -------------
 
 
 dbWriteTable(sql_connection,
