@@ -75,7 +75,7 @@ run_all <- function(conn, metadata, indicator_ids = "All", table_name) {
 output <- run_all(conn = conn,
                   metadata = metadata,
                   indicator_ids =  "All", # or a vector of numeric/char ids or single comma-separated string like "10, 11, 12"
-                  table_name = "##OF2_Indicator_Staging_Data")
+                  table_name = "[EAT_Reporting_BSOL].[OF].[OF2_Indicator_Staging_Data]")
 
 
 # 5) Add insertion time stamp and standardise schema ---------------------------
