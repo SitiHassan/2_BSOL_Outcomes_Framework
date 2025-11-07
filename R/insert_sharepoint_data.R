@@ -129,7 +129,33 @@ result <- process_indicator_excels(
 indicator_excels <- result$data
 
 # Write data into database -----------------------------------------------------
-dbWriteTable(conn,
-             name = Id(schema = "OF", table = "OF2_Indicator_Sharepoint_Data"),
-             value = indicator_excels,
-             append = TRUE)
+# Get unique, non-NA indicator_ids from the new data
+indicator_ids <- unique(na.omit(indicator_excels$indicator_id))
+
+
+if (length(indicator_ids) > 0) {
+  # Build a comma-separated list for the IN() clause
+  id_list <- paste(indicator_ids, collapse = ",")
+
+  delete_sql <- paste0(
+    "DELETE FROM [EAT_Reporting_BSOL].[OF].[OF2_Indicator_Sharepoint_Data] ",
+    "WHERE indicator_id IN (", id_list, ")"
+  )
+
+  # Run the delete statement first to remove existing rows for the specified indicators
+  message("Deleting the existing rows...")
+  dbExecute(conn, delete_sql)
+  message("Existing rows deleted ✅")
+}
+
+message("Loading data into the SharePoint table...")
+
+# Write the data
+dbWriteTable(
+  conn,
+  name  = Id(schema = "OF", table = "OF2_Indicator_Sharepoint_Data"),
+  value = indicator_excels,
+  append = TRUE
+)
+
+message("SharePoint data loaded ✅")

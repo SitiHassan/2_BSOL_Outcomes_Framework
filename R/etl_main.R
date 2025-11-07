@@ -36,7 +36,7 @@ run_all <- function(conn, metadata, indicator_ids = "All", table_name) {
   # Combine latest data
   message("▶ Combining latest data from multiple sources in SQL ...")
   dbWithTransaction(conn, {
-    run_sql_file(conn, "SQL/03_insert_into_staging_table.sql")
+    run_sql_file(conn, "SQL/04_update_staging_table.sql")
   })
 
   #  Normalize indicator_ids
@@ -71,28 +71,14 @@ run_all <- function(conn, metadata, indicator_ids = "All", table_name) {
 
 
 # 4) Execute and capture output -------------------------------------------------
+
 output <- run_all(conn = conn,
                   metadata = metadata,
-                  indicator_ids = "All", # or a vector of numeric/char ids or single comma-separated string like "10, 11, 12"
-                  table_name = "[EAT_Reporting_BSOL].[OF].[OF2_Indicator_Staging_Data]")
+                  indicator_ids =  "All", # or a vector of numeric/char ids or single comma-separated string like "10, 11, 12"
+                  table_name = "##OF2_Indicator_Staging_Data")
 
 
-# 5) Run DQ checks -------------------------------------------------------------
-staging_data <- output$staging_data|>
-  mutate(time_period_type = get_duration_label(as.Date(start_date), as.Date(end_date)))
-
-run_all_dq_checks(
-  df = output$result$combined_calc_dfs|>
-    filter(time_period_type == "1 year" & value_type_code %in% c(2, 3, 7)),
-  reference_data = staging_data |>
-    filter(time_period_type == "1 year" & value_type_code %in% c(2, 3, 7)),
-  metadata = metadata,
-  cols_to_check = NULL,  # or c("col1","col2",...)
-  show_n = 10
-)
-
-
-# 6) Add insertion time stamp and standardise schema ---------------------------
+# 5) Add insertion time stamp and standardise schema ---------------------------
 result <- output$result$combined_calc_dfs |>
   mutate(insertion_date_time = Sys.time()) |>
   mutate(
@@ -115,6 +101,13 @@ result <- output$result$combined_calc_dfs |>
     time_period_type = as.character(time_period_type),
     combination_id   = as.integer(combination_id)
   )
+
+float_cols <- c("numerator", "denominator", "indicator_value", "lower_ci95", "upper_ci95")
+
+for (col in float_cols) {
+  result[[col]] <- as.numeric(result[[col]])
+  result[[col]][!is.finite(result[[col]])] <- NA_real_
+}
 
 
 # 7) Write output into database ------------------------------------------------
