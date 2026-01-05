@@ -936,6 +936,54 @@ check_combination_splits <- function(df) {
   }
 }
 
+## Function to check duplicates ------------------------------------------------
+
+check_duplicates <- function(df, key_cols=c(
+  "indicator_id",
+  "time_period_type",
+  "aggregation_id",
+  "start_date",
+  "end_date",
+  "imd_code",
+  "ethnicity_code"
+), indicator_filter = NULL) {
+
+  result <- df %>%
+
+    # Optional indicator filter
+    {
+      if (!is.null(indicator_filter)) {
+        filter(., indicator_id %in% indicator_filter)
+      } else {
+        .
+      }
+    } |>
+
+    # Group by key columns
+    group_by(across(all_of(key_cols))) |>
+
+    # Count rows
+    summarise(row_count = n(), .groups = "drop") |>
+
+    # Keep only duplicates
+    filter(row_count > 1) |>
+
+    arrange(indicator_id)
+
+  if (nrow(result) > 0) {
+    message(
+      "❌ Duplicate records found: ",
+      nrow(result),
+      " duplicated key combination(s)."
+    )
+  } else {
+    message("✅ No duplicate records found for the specified key columns.")
+  }
+
+  return(result)
+}
+
+
 ## Run all DQ checks ------------------------------------------------------------
 
 run_all_dq_checks <- function(df, reference_data, metadata, cols_to_check = NULL, show_n = 10) {
@@ -972,6 +1020,10 @@ run_all_dq_checks <- function(df, reference_data, metadata, cols_to_check = NULL
 
   message("6) combination_id populated\n")
   check_combination_splits(df)
+  cat("\n")
+
+  message("7) Identify duplicates\n")
+  check_duplicates(df)
   message("\n==== DQ checks completed ====\n")
 }
 
