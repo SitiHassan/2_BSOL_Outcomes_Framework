@@ -10,7 +10,7 @@ library(tibble)
 run_start <- Sys.time()
 
 # Parameters -------------------------------------------------------------------
-indicator_ids <- c(108)
+indicator_ids <- c(108) # or a vector of numeric/char ids or single comma-separated string like "10, 11, 12"
 
 # 1) Database connection -------------------------------------------------------
 conn <- dbConnect(
@@ -76,7 +76,7 @@ run_all <- function(conn, metadata, indicator_ids = "All", table_name) {
 
 output <- run_all(conn = conn,
                   metadata = metadata,
-                  indicator_ids =  indicator_ids, # or a vector of numeric/char ids or single comma-separated string like "10, 11, 12"
+                  indicator_ids =  indicator_ids,
                   table_name = "[EAT_Reporting_BSOL].[OF].[OF2_Indicator_Staging_Data]")
 
 
