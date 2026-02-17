@@ -18,7 +18,7 @@ DROP TABLE IF EXISTS #sql_data
 
 SELECT * INTO #sql_data 
 FROM [EAT_Reporting_BSOL].[OF].[OF2_Indicator_SQL_Data]
-WHERE indicator_id <> 108 -- temporary exclusion --1111737
+
 
 UPDATE a
 SET a.ethnicity_code = b.ethnicity_code_OF
