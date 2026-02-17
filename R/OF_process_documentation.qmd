@@ -986,7 +986,7 @@ If the dataset that you're working with has ethnicity or IMD splits, we would li
 **Summary of required combinations:**
 
 | Combination | Sex | Age      | IMD      | Ethnicity      | Split                  |
-|-------------|-----|----------|----------|----------------|------------------------|
+|------------|------------|------------|------------|------------|---------------|
 | 1           | 999 | age_code | imd_code | ethnicity_code | both ethnicity and IMD |
 | 2           | 999 | age_code | imd_code | 999            | imd only               |
 | 3           | 999 | age_code | 999      | ethnicity_code | ethnicity only         |
@@ -2358,7 +2358,7 @@ We would like to create additional datasets in the following combinations to ena
 **Summary of required combinations:**
 
 | Combination | Sex | Age      | IMD      | Ethnicity      | Split                  |
-|-------------|-----|----------|----------|----------------|------------------------|
+|------------|------------|------------|------------|------------|---------------|
 | 1           | 999 | age_code | imd_code | ethnicity_code | both ethnicity and IMD |
 | 2           | 999 | age_code | imd_code | 999            | imd only               |
 | 3           | 999 | age_code | 999      | ethnicity_code | ethnicity only         |
@@ -3464,7 +3464,7 @@ We would like to create additional datasets in the following combinations to ena
 **Summary of required combinations:**
 
 | Combination | Sex | Age      | IMD      | Ethnicity      | Split                  |
-|-------------|-----|----------|----------|----------------|------------------------|
+|------------|------------|------------|------------|------------|---------------|
 | 1           | 999 | age_code | imd_code | ethnicity_code | both ethnicity and IMD |
 | 2           | 999 | age_code | imd_code | 999            | imd only               |
 | 3           | 999 | age_code | 999      | ethnicity_code | ethnicity only         |
