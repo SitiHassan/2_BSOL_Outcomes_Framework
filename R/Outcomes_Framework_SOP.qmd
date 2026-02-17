@@ -1,0 +1,73 @@
+---
+title: "Outcomes Framework SOP"
+format:
+  pdf:
+    toc: true
+    number-sections: true
+    colorlinks: true
+editor: visual
+---
+
+## Guidelines
+
+This document outlines the steps required to add new indicators to the Outcomes Framework process.
+
+1.  **Determine the data source** from which the indicator is derived to identify the appropriate landing pipeline where the indicator will be processed. For example:
+
+-   Data from the data warehouse: **SQL**
+-   Data pulled via API (e.g., Fingertips): **API**
+-   Data from external providers requiring a standard data template: **SharePoint**
+-   Data from any other source: **Other**
+
+2.  **Update the metadata** with the required information for the indicator you are adding. The indicator ID should be the next incremented ID (i.e., the one after the most recent ID). Ensure that all relevant columns are completed.
+
+3.  **Create and transform the dataset** according to the standard format. You can follow the [guidelines](https://birmingham-and-solihull-ics.github.io/2_BSOL_Outcomes_Framework/R/OF_process_documentation.html#ch1-sec-update-final-table) provided to build the dataset.
+
+4.  **Insert the data into the destination table** identified in Step 1. This process is also explained in the [guidelines](https://birmingham-and-solihull-ics.github.io/2_BSOL_Outcomes_Framework/R/OF_process_documentation.html#ch1-sec-update-final-table) provided. If the dataset is pre-calculated or the data comes from an external provider (and therefore uses the SharePoint route), ensure that the latest version of the [standard data template](https://birminghamandsolihullccg.sharepoint.com/:x:/r/sites/BirminghamandSolihullIntegratedIntelligenceHub/Shared%20Documents/Outcomes%20Framework%20Rebuild/Data/Data%20Entry%20Template/data_entry_template.xlsx?d=wddf3ec3cb71d4303a60e4899dca4986b&csf=1&web=1&e=kaPIZX) is used to submit the data.
+
+5.  **Finalise metadata and documentation**. Once you have built the dataset, ensure that any remaining fields in the metadata are completed, including caveats or notes.
+
+## Metadata Checklist
+
+-   Review populated fields.
+-   Ensure the fields accurately reflect the data extracted.
+-   Populate any empty fields.
+-   Review and update links (some may be broken due to website URL changes).
+-   Review caveats, such as updates from Fingertips.
+-   Review the indicator status, as some may have changed.
+
+## Simplified Flowchart
+
+
+```{mermaid}
+%%| fig-width: 7
+
+flowchart TD
+
+    A(Start) --> B[Identify Source of Indicator]
+
+    subgraph Bsub[Determine Source Type]
+        direction TB
+        B1[SQL – Warehouse]
+        B2[API – Fingertips]
+        B3[SharePoint – Template]
+        B4[Other Sources]
+    end
+
+    B --> Bsub
+    Bsub --> C[Update Metadata]
+    C --> D[Create & Transform Dataset]
+    D --> E[Insert Data into Destination Table]
+    E --> F[Finalise Metadata & Notes]
+    F --> G(End)
+
+    %% Styling
+    classDef startNode fill:#4CAF50,stroke:#2E7D32,color:#ffffff;
+    classDef endNode fill:#FFB300,stroke:#FF8F00,color:#000000;
+
+    class A startNode;
+    class G endNode;
+
+```
+
+
