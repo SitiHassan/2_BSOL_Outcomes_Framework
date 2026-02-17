@@ -38,7 +38,6 @@ This document outlines the steps required to add new indicators to the Outcomes 
 
 ## Simplified Flowchart
 
-
 ```{mermaid}
 %%| fig-width: 7
 
@@ -69,5 +68,3 @@ flowchart TD
     class G endNode;
 
 ```
-
-
