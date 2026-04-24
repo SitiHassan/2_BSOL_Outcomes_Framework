@@ -1,70 +1,228 @@
 ---
 title: "Outcomes Framework SOP"
+date: today
+author: Siti Hassan
+date-format: "DD MMMM YYYY"
 format:
-  pdf:
+  html:
     toc: true
+    toc-depth: 3
+    toc-expand: true
+    toc-location: left
+    toc-title: Table of Contents
     number-sections: true
-    colorlinks: true
+    embed-resources: true
+    standalone: true
+    code-fold: true
+    code-summary: "Show code"
+    link-external-icon: true
+    link-external-newwindow: true
+    citations-hover: true
+    footnotes-hover: true
+    title-block-banner: '#005EB8'
+    backgroundcolor: '#f0f4f5'
+    highlight-style: tango
+execute:
+  echo: true          
+  cache: false
+  warning: false
+  error: false
+  freeze: auto        
 editor: visual
 ---
 
-## Guidelines
+## Process Overview
 
-This document outlines the steps required to add new indicators to the Outcomes Framework process.
+The Outcomes Framework process is split into two stages:
 
-1.  **Determine the data source** from which the indicator is derived to identify the appropriate landing pipeline where the indicator will be processed. For example:
+### User / Data Owner Responsibilities
+- Identify the indicator source  
+- Complete metadata  
+- Confirm lookup requirements  
+- Prepare or submit the dataset  
 
--   Data from the data warehouse: **SQL**
--   Data pulled via API (e.g., Fingertips): **API**
--   Data from external providers requiring a standard data template: **SharePoint**
--   Data from any other source: **Other**
+### Analyst / Data Team Responsibilities
+- Load metadata into the database  
+- Update reference tables where required  
+- Generate reference population data  
+- Update age metadata  
+- Load data into staging tables  
+- Run the R calculation process  
+- Validate calculated values  
+- Publish outputs to the final processed table  
 
-2.  **Update the metadata** with the required information for the indicator you are adding. The indicator ID should be the next incremented ID (i.e., the one after the most recent ID). Ensure that all relevant columns are completed.
 
-3.  **Create and transform the dataset** according to the standard format. You can follow the [guidelines](https://birmingham-and-solihull-ics.github.io/2_BSOL_Outcomes_Framework/R/OF_process_documentation.html#ch1-sec-update-final-table) provided to build the dataset.
+## User / Data Owner Responsibilities
 
-4.  **Insert the data into the destination table** identified in Step 1. This process is also explained in the [guidelines](https://birmingham-and-solihull-ics.github.io/2_BSOL_Outcomes_Framework/R/OF_process_documentation.html#ch1-sec-update-final-table) provided. If the dataset is pre-calculated or the data comes from an external provider (and therefore uses the SharePoint route), ensure that the latest version of the [standard data template](https://birminghamandsolihullccg.sharepoint.com/:x:/r/sites/BirminghamandSolihullIntegratedIntelligenceHub/Shared%20Documents/Outcomes%20Framework%20Rebuild/Data/Data%20Entry%20Template/data_entry_template.xlsx?d=wddf3ec3cb71d4303a60e4899dca4986b&csf=1&web=1&e=kaPIZX) is used to submit the data.
+### Identify the Data Source
 
-5.  **Finalise metadata and documentation**. Once you have built the dataset, ensure that any remaining fields in the metadata are completed, including caveats or notes.
+Determine the source of the indicator to identify the appropriate landing route:
 
-## Metadata Checklist
+- **SQL**: Data from the data warehouse  
+- **API**: Data pulled via API (e.g. Fingertips)  
+- **SharePoint**: Data from external providers or pre-calculated data using the standard template  
+- **Other**: Any other source  
 
--   Review populated fields.
--   Ensure the fields accurately reflect the data extracted.
--   Populate any empty fields.
--   Review and update links (some may be broken due to website URL changes).
--   Review caveats, such as updates from Fingertips.
--   Review the indicator status, as some may have changed.
+
+### Complete Indicator Metadata
+
+Update the metadata control file with all required information for the new indicator.
+
+- The `indicator_id` must be the next sequential ID (increment from the most recent ID)  
+- Ensure all key fields are completed, especially:
+
+  - `indicator_id`  
+  - `age`  
+  - `population_type`  
+  - `sex`  
+  - `imd`  
+  - `geography` 
+  - `precalculated`  
+
+
+### Confirm Lookup Requirements
+
+Check whether required lookup values already exist, including:
+
+- Age bands  
+- Geography codes  
+- Sex codes  
+- IMD codes  
+- Population type  
+
+If new lookup values are required, request that they are added before the data is processed.
+
+
+### Prepare or Submit the Dataset
+
+Prepare the dataset in the required standard format.
+
+Refer to the official [guidelines](https://birmingham-and-solihull-ics.github.io/2_BSOL_Outcomes_Framework/R/OF_process_documentation.html#ch1-sec-update-final-table).
+
+If the data is pre-calculated or provided externally, submit it using the latest standard data entry template:  [Data Entry Template](https://birminghamandsolihullccg.sharepoint.com/:x:/r/sites/BirminghamandSolihullIntegratedIntelligenceHub/Shared%20Documents/Outcomes%20Framework%20Rebuild/Data/Data%20Entry%20Template/data_entry_template.xlsx?d=wddf3ec3cb71d4303a60e4899dca4986b&csf=1&web=1&e=kaPIZX).
+
+Before loading data into the landing table, confirm that:
+
+- indicator IDs are correct  
+- reused SQL scripts have been updated to avoid mismatches  
+- column names and data types match the expected structure  
+
+
+## Analyst / Data Team Responsibilities
+
+### Review Submitted Metadata and Dataset
+
+Review the submitted metadata and dataset to ensure:
+
+- required fields are complete  
+- indicator IDs are correct  
+- age bands match the reference table  
+- dataset structure follows the standard format  
+- values are suitable for processing  
+
+Load the updated metadata into the database.
+
+
+### Update Lookup and Reference Tables
+
+Where new lookup values are required, update the relevant lookup file and load the updated reference data into the database.
+
+This includes:
+
+- age group reference table  
+- geography reference table  
+- value type reference table  
+- other relevant lookup tables  
+
+
+### Generate Denominators and Update Age Metadata
+
+Once the new data has been added to the landing table:
+
+- Generate Census-based denominators where required  
+- Update the age metadata  
+
+This includes:
+
+- updating population denominators, particularly when new age bands are introduced  
+- generating age metadata for DASR indicators  
+
+
+### Load Data into the Staging Table and Run Calculation Process
+
+Insert the new indicator data into the appropriate staging table and run the R calculation process.
+
+This includes:
+
+- combining data from multiple landing tables into a unified staging table  
+- running the R process to calculate:
+  - crude rates  
+  - directly age-standardised rates (DASR)  
+  - counts  
+  - percentages  
+  - other required metrics  
+- confirming that calculations have completed successfully  
+
+
+
+### Validate and Publish Outputs
+
+Review the calculated outputs before publishing.
+
+Validation checks should include:
+
+- no missing values where values are expected  
+- correct denominators used  
+- correct age, sex, geography, IMD, and population filters applied  
+- values are reasonable compared to previous periods  
+- caveats and notes are documented  
+
+Once validation is complete, publish the output to the final processed table.
+
+
 
 ## Simplified Flowchart
 
 ```{mermaid}
-%%| fig-width: 7
-
+%%| fig-width: 6
+%%| fig-align: center
+%%| 
 flowchart TD
 
-    A(Start) --> B[Identify Source of Indicator]
+    A(Start) --> B[User: Identify Indicator Source]
+    B --> C[User: Complete Metadata]
+    C --> D[User: Confirm Lookup Requirements]
+    D --> E[User: Prepare or Submit Dataset]
 
-    subgraph Bsub[Determine Source Type]
-        direction TB
-        B1[SQL – Warehouse]
-        B2[API – Fingertips]
-        B3[SharePoint – Template]
-        B4[Other Sources]
-    end
+    E --> F[Analyst: Review Metadata and Dataset]
+    F --> G[Analyst: Update Lookups and Reference Tables]
+    G --> H[Analyst: Load Data to Landing Table]
+    H --> I[Analyst: Generate Denominators & Age Metadata]
+    I --> J[Analyst: Load to Staging Table]
+    J --> K[Analyst: Run R Calculation Process]
+    K --> L[Analyst: Validate Outputs]
+    L --> M[Analyst: Publish to Final Table]
+    M --> N(End)
 
-    B --> Bsub
-    Bsub --> C[Update Metadata]
-    C --> D[Create & Transform Dataset]
-    D --> E[Insert Data into Destination Table]
-    E --> F[Finalise Metadata & Notes]
-    F --> G(End)
+    %% Styles
 
-    %% Styling
-    classDef startNode fill:#4CAF50,stroke:#2E7D32,color:#ffffff;
-    classDef endNode fill:#FFB300,stroke:#FF8F00,color:#000000;
+    %% Start (Green)
+    classDef startNode fill:#4CAF50,stroke:#2E7D32,color:#ffffff,stroke-width:2px;
+
+    %% End (Orange)
+    classDef endNode fill:#FFB74D,stroke:#EF6C00,color:#000000,stroke-width:2px;
+
+    %% User (Blue)
+    classDef user fill:#E3F2FD,stroke:#1E88E5,color:#000,stroke-width:1.5px;
+
+    %% Analyst (Pink)
+    classDef analyst fill:#FCE4EC,stroke:#D81B60,color:#000,stroke-width:1.5px;
+
+    %% Apply Styles
 
     class A startNode;
-    class G endNode;
+    class N endNode;
 
+    class B,C,D,E user;
+    class F,G,H,I,J,K,L,M analyst;
 ```
