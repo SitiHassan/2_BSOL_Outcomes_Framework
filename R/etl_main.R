@@ -10,7 +10,7 @@ library(tibble)
 run_start <- Sys.time()
 
 # Parameters -------------------------------------------------------------------
-indicator_ids <- c(108) # or a vector of numeric/char ids or single comma-separated string like "10, 11, 12"
+ids <- c(108, 138, 139) # or a vector of numeric/char ids or single comma-separated string like "10, 11, 12"
 
 # 1) Database connection -------------------------------------------------------
 conn <- dbConnect(
@@ -24,12 +24,12 @@ conn <- dbConnect(
 # 2) Read metadata -------------------------------------------------------------
 metadata <- dbGetQuery(conn, "SELECT * FROM [EAT_Reporting_BSOL].[OF].[OF2_Reference_Metadata]")
 
+# Source function files
+source(file.path("R/utils.R"))
+source(file.path("R/etl.R"))
 
 # 3) Define a runner that sources functions and executes the ETL ---------------
 run_all <- function(conn, metadata, indicator_ids = "All", table_name) {
-  # Source function files
-  source(file.path("R/utils.R"))
-  source(file.path("R/etl.R"))
 
   # Process SharePoint data
   message("▶ Processing Sharepoint data ...")
@@ -44,7 +44,7 @@ run_all <- function(conn, metadata, indicator_ids = "All", table_name) {
   #  Normalize indicator_ids
   ids <- normalize_indicator_ids(indicator_ids)
 
-  # Pull fresh staging data (optionally filtered)
+  # Pull fresh staging data
   if (is.null(ids) || length(ids) == 0) {
     message("▶ Extracting ALL indicators from staging table ...")
   } else {
@@ -76,7 +76,7 @@ run_all <- function(conn, metadata, indicator_ids = "All", table_name) {
 
 output <- run_all(conn = conn,
                   metadata = metadata,
-                  indicator_ids =  indicator_ids,
+                  indicator_ids =  ids,
                   table_name = "[EAT_Reporting_BSOL].[OF].[OF2_Indicator_Staging_Data]")
 
 
@@ -122,7 +122,7 @@ insert_data_into_sql_table(
   schema   = "OF",
   table    = "OF2_Indicator_Processed_Data",
   data     = result,
-  indicator_ids = indicator_ids,
+  indicator_ids = ids,
   id_column = "indicator_id"
 )
 
