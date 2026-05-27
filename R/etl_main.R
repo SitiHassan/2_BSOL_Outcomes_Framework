@@ -10,7 +10,7 @@ library(tibble)
 run_start <- Sys.time()
 
 # Parameters -------------------------------------------------------------------
-ids <- c(108, 138, 139) # or a vector of numeric/char ids or single comma-separated string like "10, 11, 12"
+ids <- c(108, 138) # or a vector of numeric/char ids or single comma-separated string like "10, 11, 12"
 
 # 1) Database connection -------------------------------------------------------
 conn <- dbConnect(
