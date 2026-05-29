@@ -40,7 +40,7 @@ population_reference_file <- clean_names(population_reference_file, case = "snak
 
 # Metadata
 
-metadata <- read_xlsx("data/metadata/metadata.xlsx")
+metadata <- read_xlsx(file.path(directory_path, "Metadata/metadata.xlsx"))
 
 metadata <- janitor::clean_names(metadata, case = "snake") |>
   select(-in_destination_table_internal_use_only)
