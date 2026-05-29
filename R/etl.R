@@ -810,9 +810,9 @@ check_row_counts <- function(df, reference_data) {
   reference_rows <- nrow(reference_data)
 
   if (input_rows == reference_rows) {
-    message("\u2705 Row counts match: ", input_rows, " rows")
+    message("\u2705 PASS: Row counts match: ", input_rows, " rows")
   } else {
-    message("\u274C Row counts do NOT match. ",
+    message("\u274C FAIL: Row counts do NOT match. ",
             "Input: ", input_rows, " rows | Reference: ", reference_rows, " rows")
   }
 }
@@ -822,7 +822,8 @@ check_row_counts <- function(df, reference_data) {
 # ignoring numerator and denominator as these can be empty columns for pre-calculated indicators
 
 check_rows_with_missing <- function(df, metadata, cols = NULL,
-                              ignore = c("numerator", "denominator")
+                              ignore = c("numerator", "denominator"),
+                              show_n = 10
                               ) {
   # Inputs:
   #   df     - data frame whose rows will be checked
@@ -840,10 +841,19 @@ check_rows_with_missing <- function(df, metadata, cols = NULL,
   cols_to_check <-
     if (is.null(cols)) setdiff(names(df), ignore) else intersect(cols, names(df))
 
-  df %>%
+  miss_df <- df |>
     filter(denominator != 0 & !is.na(denominator)) |> # rows required processing
     filter(indicator_id %in% current_ids) |>
     filter(if_any(all_of(cols_to_check), ~ is.na(.x)))
+
+  if (nrow(miss_df) == 0) {
+    message("\u2705 PASS: No rows with missing values in the checked columns.")
+  } else {
+    message("\u274C FAIL: Found rows with missing values in the checked columns: ", nrow(miss_df))
+    print(utils::head(miss_df, show_n))
+  }
+
+  return(miss_df)
 
 }
 
@@ -868,9 +878,9 @@ check_age_group_code <- function(df) {
     filter(count > 1)
 
   if(nrow(unique_age_count) == 0){
-    print("\u2705 One unique age group code per dasr indicator ID")
+    message("\u2705 PASS: One unique age group code per dasr indicator ID")
   } else{
-    print("\u274C More than 1 age group code per dasr indicator ID")
+    message("\u274C FAIL: More than 1 age group code per dasr indicator ID")
   }
 }
 
@@ -886,9 +896,9 @@ check_time_period_type <- function(df) {
     distinct(indicator_id, start_date, end_date)
 
   if (nrow(missing_rows) == 0) {
-    message("\u2705 All indicators passed: time_period_type is populated for all rows.")
+    message("\u2705 PASS: time_period_type is populated for all rows.")
   } else {
-    message("\u274C Some indicators are missing time_period_type. Details below:")
+    message("\u274C FAIL: Some indicators are missing time_period_type. Details below:")
     print(missing_rows)
   }
 }
@@ -929,9 +939,9 @@ check_combination_splits <- function(df) {
     filter(is.na(combination_id))
 
   if (nrow(missing_rows) == 0) {
-    message("\u2705 All indicators passed: combination_id is populated for all rows.")
+    message("\u2705 PASS: combination_id is populated for all rows.")
   } else {
-    message("\u274C Some indicators are missing combination_id. Details below:")
+    message("\u274C FAIL: Some indicators are missing combination_id. Details below:")
     print(missing_rows)
   }
 }
@@ -972,17 +982,49 @@ check_duplicates <- function(df, key_cols=c(
 
   if (nrow(result) > 0) {
     message(
-      "❌ Duplicate records found: ",
+      "\u274C FAIL: Duplicate records found: ",
       nrow(result),
       " duplicated key combination(s)."
     )
   } else {
-    message("✅ No duplicate records found for the specified key columns.")
+    message("\u2705 PASS: No Duplicate records found for the specified key columns")
   }
 
   return(result)
 }
 
+## Function to check source codes ----------------------------------------------
+
+check_source_code <- function(
+    df,
+    indicator_col = "indicator_id",
+    source_code_col = "source_code"){
+
+  # Count distinct source codes per indicator
+  results <- df |>
+    group_by(.data[[indicator_col]]) |>
+    summarise(
+      n_source_codes = n_distinct(.data[[source_code_col]]),
+      source_codes = paste(unique(.data[[source_code_col]]), collapse = ", "),
+      .groups = "drop"
+    ) |>
+    filter(n_source_codes > 1)
+
+  if(nrow(results) > 0){
+    message("\u274C FAIL: Some indicators have more than one source code.")
+    return(results)
+  }else{
+    message("\u2705 PASS: Every indicator has exactly one source code.")
+    return(NULL)
+  }
+}
+
+# df <- data.frame(
+#   indicator_id = c(1,1,2,2,3,3),
+#   source_code = c(1,2, 3,3, 1, 2 )
+# )
+#
+# check_source_code(df)
 
 ## Run all DQ checks ------------------------------------------------------------
 
@@ -994,13 +1036,7 @@ run_all_dq_checks <- function(df, reference_data, metadata, cols_to_check = NULL
   cat("\n")
 
   message("2) Rows with missing required columns\n")
-  miss_df <- check_rows_with_missing(df, metadata, cols = cols_to_check)
-  if (nrow(miss_df) == 0) {
-    message("\u2705 No rows with missing values in the checked columns.")
-  } else {
-    message("\u274C Found rows with missing values in the checked columns: ", nrow(miss_df))
-    print(utils::head(miss_df, show_n))
-  }
+  check_rows_with_missing(df, metadata = metadata)
   cat("\n")
 
   message("3) Unique age_group_code for DASR indicators\n")
@@ -1012,10 +1048,7 @@ run_all_dq_checks <- function(df, reference_data, metadata, cols_to_check = NULL
   cat("\n")
 
   message("5) Active indicator values populated\n")
-  act_fail <- check_active_indicator_values(df, metadata)
-  if (is.data.frame(act_fail) && nrow(act_fail) > 0) {
-    print(utils::head(act_fail, show_n))
-  }
+  check_active_indicator_values(df, metadata)
   cat("\n")
 
   message("6) combination_id populated\n")
@@ -1024,6 +1057,10 @@ run_all_dq_checks <- function(df, reference_data, metadata, cols_to_check = NULL
 
   message("7) Identify duplicates\n")
   check_duplicates(df)
+  cat("\n")
+
+  message("8) Check number of unique source codes \n")
+  check_source_code(df)
   message("\n==== DQ checks completed ====\n")
 }
 
