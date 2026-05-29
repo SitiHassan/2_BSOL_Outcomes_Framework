@@ -39,7 +39,7 @@ process_indicator_excels <- function(
   for (i in seq_along(files)) {
     path  <- files[i]
     fname <- basename(path)
-    message(sprintf("🔍 Processing file %d of %d: %s", i, total, fname))
+    message(sprintf("\U0001F50D Processing file %d of %d: %s", i, total, fname))
 
     # --- validation ---
     val <- try(
@@ -50,7 +50,7 @@ process_indicator_excels <- function(
     )
     if (inherits(val, "try-error") || is.na(suppressWarnings(as.numeric(val[[1,1]]))) ||
         as.numeric(val[[1,1]]) != 0) {
-      message(sprintf("⚠️  Skipping file %d of %d due to validation error: %s", i, total, fname))
+      message(sprintf("\u26A0\uFE0F Skipping file %d of %d due to validation error: %s", i, total, fname))
       fail <- c(fail, fname)
       next
     }
@@ -61,7 +61,7 @@ process_indicator_excels <- function(
       silent = TRUE
     )
     if (inherits(df, "try-error")) {
-      message(sprintf("⚠️  Skipping file %d of %d due to read error: %s", i, total, fname))
+      message(sprintf("\u26A0\uFE0F  Skipping file %d of %d due to read error: %s", i, total, fname))
       fail <- c(fail, fname)
       next
     }
@@ -98,17 +98,17 @@ process_indicator_excels <- function(
       if (file.copy(path, dest, overwrite = TRUE)) unlink(path)
     }
 
-    message(sprintf("✅ Processed file %d of %d: %s", i, total, fname))
+    message(sprintf("\u2705 processed file %d of %d: %s", i, total, fname))
   }
 
   # --- summary ---
   message("────────────────────────────────────")
   message(sprintf("Finished: %d of %d files processed.", length(success), total))
   if (length(fail)) {
-    message("❌ The following files failed:")
+    message("\u274C The following files failed:")
     message("   - ", paste(fail, collapse = "\n   - "))
   } else {
-    message("All files processed successfully ✅")
+    message("All files processed successfully \u2705")
   }
 
   list(
@@ -145,7 +145,7 @@ if (length(indicator_ids) > 0) {
   # Run the delete statement first to remove existing rows for the specified indicators
   message("Deleting the existing rows...")
   dbExecute(conn, delete_sql)
-  message("Existing rows deleted ✅")
+  message("Existing rows deleted \u2705")
 }
 
 message("Loading data into the SharePoint table...")
@@ -158,4 +158,4 @@ dbWriteTable(
   append = TRUE
 )
 
-message("SharePoint data loaded ✅")
+message("SharePoint data loaded \u2705")
