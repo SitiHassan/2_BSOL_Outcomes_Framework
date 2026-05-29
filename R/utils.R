@@ -354,10 +354,15 @@ dsr_inner2 <-
         total_count = sum(.data$x, na.rm = TRUE),
         total_pop   = sum(.data$n),
         base_value  = sum(.data$wt_rate) / sum(.data$stdpop),
-        vardsr = dplyr::case_when(
-          isTRUE(use_nonindependent_vardsr) ~ unique(.data$custom_vardsr),
-          TRUE ~ 1 / sum(.data$stdpop)^2 * sum(.data$sq_rate)
-        ),
+        vardsr = if (isTRUE(use_nonindependent_vardsr)) {
+          unique(.data$custom_vardsr)
+        } else {
+          1 / sum(.data$stdpop)^2 * sum(.data$sq_rate)
+        },
+        # vardsr = dplyr::case_when(
+        #   isTRUE(use_nonindependent_vardsr) ~ unique(.data$custom_vardsr),
+        #   TRUE ~ 1 / sum(.data$stdpop)^2 * sum(.data$sq_rate)
+        # ),
         multiplier = dplyr::first(.data$multiplier),
         .groups = "keep"
       )
