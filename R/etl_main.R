@@ -10,7 +10,7 @@ library(tibble)
 run_start <- Sys.time()
 
 # Parameters -------------------------------------------------------------------
-ids <- c(108, 138) # or a vector of numeric/char ids or single comma-separated string like "10, 11, 12"
+ids <- c(56) # or a vector of numeric/char ids or single comma-separated string like "10, 11, 12"
 
 # 1) Database connection -------------------------------------------------------
 conn <- dbConnect(
@@ -80,8 +80,10 @@ output <- run_all(conn = conn,
                   table_name = "[EAT_Reporting_BSOL].[OF].[OF2_Indicator_Staging_Data]")
 
 
-# Check duplicates
-check_duplicates(output$result$combined_calc_dfs)
+# Run all DQ checks
+run_all_dq_checks(df = output$result$combined_calc_dfs,
+                  reference_data = output$staging_data,
+                  metadata = metadata)
 
 # 5) Add insertion time stamp and standardise schema ---------------------------
 result <- output$result$combined_calc_dfs |>
