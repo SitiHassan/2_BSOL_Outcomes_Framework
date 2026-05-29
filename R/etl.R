@@ -543,7 +543,7 @@ calc_dasr <- function(df_in, metadata, age_lookup){
 calculate_values <- function(data, metadata, metadata_key = "indicator_id"){
 
   # -------- Validate inputs / bring in multiplier ---------------------------
-  message("▶ Cleaning data types and validating inputs...")
+  message("\u25B6 Cleaning data types and validating inputs...")
   df <- data |>
     mutate(time_period_type = get_duration_label(as.Date(start_date), as.Date(end_date))) |>
     create_combination_id() |>
@@ -570,12 +570,12 @@ calculate_values <- function(data, metadata, metadata_key = "indicator_id"){
   metadata2 <- metadata |> select(all_of(metadata_cols))
 
   # Bring metadata onto staging
-  message("▶ Bringing metadata onto staging table...")
+  message("\u25B6 Bringing metadata onto staging table...")
   df <- df |>
       left_join(metadata2, by = setNames(metadata_key, metadata_key))
 
   # Exclude incomplete data
-  message("▶ Excluding incomplete data..")
+  message("\u25B6 Excluding incomplete data..")
   df <- exclude_incomplete_data(df = df, year_type_col = "year_type",
                                     start_date_col = "start_date", end_date_col = "end_date",
                                     time_period_col = "time_period_type",
@@ -583,17 +583,17 @@ calculate_values <- function(data, metadata, metadata_key = "indicator_id"){
 
 
   # Create 3 and 5 year pooled data
-  message("▶ Creating 3 and 5 year pooled data...")
+  message("\u25B6 Creating 3 and 5 year pooled data...")
   pooled_df <- create_pooled_with_ranges(df, ks = c(3,5), POOL_KEYS = POOL_KEYS) |>
     left_join(metadata2, by = setNames(metadata_key, metadata_key))
 
   # Combine pooled data with yearly data
-  message("▶ Combining yearly and pooled data...")
+  message("\u25B6 Combining yearly and pooled data...")
   all_df <- bind_rows(pooled_df, df)
 
   # --- Partition rows -------------------------------------------------------
   # Rows that *need* a calculation: missing indicator_value AND denominator present/non-zero
-  message("▶ Determining rows requiring calculations...")
+  message("\u25B6 Determining rows requiring calculations...")
   needs_calc <- is.na(all_df$indicator_value) & (!is.na(all_df$denominator) & all_df$denominator != 0)
 
   # Only process where status_code == 1 or 2 AND multiplier is present
@@ -622,22 +622,22 @@ calculate_values <- function(data, metadata, metadata_key = "indicator_id"){
 
 
   # -------- Percentage ------------------------------------------------------
-  message("▶ Calculating percentage...")
+  message("\u25B6 Calculating percentage...")
   temp1 <- df_calc |> calc_percentage() |>
     tidy_output()
 
   # -------- Crude rate & Ratio ----------------------------------------------
-  message("▶ Calculating crude rate and ratio...")
+  message("\u25B6 Calculating crude rate and ratio...")
   temp2 <- df_calc |> calc_crude_or_ratio() |>
     tidy_output()
 
   # -------- Directly age standardised rate (DASR) ---------------------------
-  message("▶ Calculating DASR...")
+  message("\u25B6 Calculating DASR...")
   temp3 <- df_calc |> calc_dasr(metadata = metadata2, age_lookup = age_lookup) |>
     tidy_output()
 
   # -------- Combine all outputs ---------------------------------------------
-  message("▶ Combining all outputs...")
+  message("\u25B6 Combining all outputs...")
   output <- bind_rows(
     df_keep,          # Rows not calculated
     df_skip,          # Rows that needed calc but were ineligible (status/multiplier)
@@ -647,7 +647,7 @@ calculate_values <- function(data, metadata, metadata_key = "indicator_id"){
   ) |> clean_data_types()
 
   # -------- Reporting of output ---------------------------------------------
-  message("▶ Reporting output total rows...")
+  message("\u25B6 Reporting output total rows...")
   print(paste("Total rows for df_keep:", nrow(df_keep)))
   print(paste("Total rows for df_skip:", nrow(df_skip)))
   print(paste("Total rows for temp1 (perc):", nrow(temp1)))
@@ -655,7 +655,7 @@ calculate_values <- function(data, metadata, metadata_key = "indicator_id"){
   print(paste("Total rows for temp3 (DASR):", nrow(temp3)))
 
   # -------- Reporting of skipped items --------------------------------------
-  message("▶ Reporting skipped items...")
+  message("\u25B6 Reporting skipped items...")
   if (any(needs_calc & !eligible_for_processing)) {
     reasons_df <- all_df[needs_calc & !eligible_for_processing, ] |>
       transmute(
@@ -1026,6 +1026,35 @@ check_source_code <- function(
 #
 # check_source_code(df)
 
+# Function to check valid percentages ------------------------------------------
+check_percentages <- function(df){
+  invalid_rows <- df |>
+    filter(value_type_code == 2,
+           !is.na(indicator_value),
+           indicator_value > 100)
+
+  if(nrow(invalid_rows) > 0){
+
+    failed_indicators <- unique(invalid_rows$indicator_id)
+    message("\u274C FAIL: Found percentages greather than 100 for indicator(s):",
+            paste(failed_indicators, collapse = ", ")
+            )
+
+  } else{
+    message("\u2705 PASS: All percentage values are valid.")
+  }
+
+  return(invalid_rows)
+}
+
+# df <- data.frame(
+#   indicator_id = c(1,1,2,2),
+#   value_type_code = c(2,2,2,1),
+#   indicator_value = c(95,120,105,300)
+# )
+#
+# check_percentages(df)
+
 ## Run all DQ checks ------------------------------------------------------------
 
 run_all_dq_checks <- function(df, reference_data, metadata, cols_to_check = NULL, show_n = 10) {
@@ -1061,6 +1090,11 @@ run_all_dq_checks <- function(df, reference_data, metadata, cols_to_check = NULL
 
   message("8) Check number of unique source codes \n")
   check_source_code(df)
+  cat("\n")
+
+  message("9) Check invalid percentage values \n")
+  check_percentages(df)
+
   message("\n==== DQ checks completed ====\n")
 }
 
